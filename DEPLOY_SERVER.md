@@ -123,22 +123,17 @@ location = /Tournament {
     return 301 /Tournament/;
 }
 
-# /Tournament/ でファイルを配信
+# /Tournament/ でファイルを配信（root を使用 - より確実）
 location /Tournament/ {
-    alias /var/www/Tournament/;
+    root /var/www;
     index index.html;
-    try_files $uri $uri/ @tournament_fallback;
+    try_files $uri $uri/ /Tournament/index.html;
     
     # 静的ファイルのキャッシュ設定
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
-}
-
-# Tournament用のフォールバック
-location @tournament_fallback {
-    rewrite ^/Tournament/(.*)$ /Tournament/index.html last;
 }
 
 # APIプロキシ設定（location / より前に配置）
