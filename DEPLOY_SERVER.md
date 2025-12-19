@@ -110,7 +110,9 @@ sudo chmod -R 755 /var/www/Tournament
 
 ### 4. Nginx設定
 
-既存のNginx設定ファイル（例: `/etc/nginx/sites-available/default`）に以下を追加：
+**重要**: 複数の設定ファイルが有効な場合、`judge-management-system` に設定を追加することを推奨します。
+
+既存のNginx設定ファイル（`/etc/nginx/sites-available/judge-management-system`）に以下を追加：
 
 ```nginx
 # /Tournament パスでフロントエンドを配信
@@ -143,9 +145,20 @@ location /api {
 設定を反映：
 
 ```bash
+# バックアップを取る（推奨）
+sudo cp /etc/nginx/sites-available/judge-management-system /etc/nginx/sites-available/judge-management-system.backup
+
+# 設定ファイルを編集
+sudo nano /etc/nginx/sites-available/judge-management-system
+
+# 設定をテスト
 sudo nginx -t  # 設定ファイルの構文チェック
-sudo systemctl reload nginx  # Nginxをリロード
+
+# Nginxをリロード
+sudo systemctl reload nginx
 ```
+
+**注意**: 複数の設定ファイルが有効な場合（`default` と `judge-management-system` の両方）、`judge-management-system` に追加することを推奨します。`server_name` の設定によって、どちらの設定が適用されるかが決まります。
 
 ### 5. バックエンドのデプロイ（同じサーバーにデプロイする場合）
 
