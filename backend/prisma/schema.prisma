@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organizedTournaments Tournament[] @relation("Organizer")
+  participations       Participant[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ORGANIZER
+  ADMIN
+}
+
+model Tournament {
+  id                String   @id @default(uuid())
+  name              String
+  description       String?
+  organizerId       String
+  organizer         User     @relation("Organizer", fields: [organizerId], references: [id])
+  status            TournamentStatus @default(DRAFT)
+  checkInQrCode     String   @unique
+  preliminaryRounds String  // JSON形式で保存: number | "until_one_undefeated" | "until_two_undefeated"
+  tournamentSize    Int      // 4, 8, 16, 32
+  currentRound      Int      @default(0)
+  maxRounds         Int      @default(0)
+  // エントリー期間
+  entryStartAt      DateTime?
+  entryEndAt        DateTime?
+  // 定員数（nullの場合は無制限）
+  capacity          Int?
+  // イベント情報
+  eventDate         DateTime? // イベント開催日付
+  registrationTime  DateTime? // 受付時間
+  startTime         DateTime? // 大会開始時間
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  participants Participant[]
+  matches      Match[]
+
+  @@map("tournaments")
+}
+
+enum TournamentStatus {
+  DRAFT
+  REGISTRATION
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Participant {
+  id                String   @id @default(uuid())
+  tournamentId      String
+  tournament        Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  // エントリー情報
+  enteredAt         DateTime @default(now())
+  isWaitlist        Boolean  @default(false) // キャンセル待ちかどうか
+  cancelledAt       DateTime? // キャンセル日時
+  checkedIn         Boolean  @default(false)
+  checkedInAt       DateTime?
+  dropped           Boolean  @default(false)
+  droppedAt         DateTime?
+
+  // 予選成績
+  wins              Int      @default(0)
+  losses            Int      @default(0)
+  draws             Int      @default(0)
+  points            Float    @default(0) // 累計得点
+  omw               Float    @default(0) // OMW%
+  gameWins          Int      @default(0) // 勝手累点
+  averageOmw        Float    @default(0) // 平均OMW%
+  rank              Int      @default(0)
+
+  // トーナメント成績
+  tournamentWins    Int      @default(0)
+  tournamentLosses  Int      @default(0)
+  tournamentEliminated Boolean @default(false)
+
+  matchesAsPlayer1  Match[]  @relation("Player1")
+  matchesAsPlayer2  Match[]  @relation("Player2")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tournamentId, userId])
+  @@map("participants")
+}
+
+model Match {
+  id                String   @id @default(uuid())
+  tournamentId      String
+  tournament        Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  round             Int
+  matchNumber       Int
+  player1Id         String
+  player1           Participant @relation("Player1", fields: [player1Id], references: [id])
+  player2Id         String
+  player2           Participant @relation("Player2", fields: [player2Id], references: [id])
+  tableNumber       Int?
+  result            MatchResult?
+  reportedBy        String?
+  reportedAt        DateTime?
+  isTournamentMatch Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([tournamentId, round, matchNumber])
+  @@map("matches")
+}
+
+enum MatchResult {
+  PLAYER1
+  PLAYER2
+  DRAW
+}
+
