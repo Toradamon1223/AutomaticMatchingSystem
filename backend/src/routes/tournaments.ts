@@ -257,7 +257,8 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
       },
     })
 
-    if (existingEntry && !existingEntry.cancelledAt) {
+    // 既にエントリー済みで、キャンセルも棄権もしていない場合はエラー
+    if (existingEntry && !existingEntry.cancelledAt && !existingEntry.dropped) {
       return res.status(400).json({ message: '既にエントリー済みです' })
     }
 
@@ -266,14 +267,17 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
     // エントリー作成または再エントリー
-    if (existingEntry && existingEntry.cancelledAt) {
-      // 再エントリー
+    if (existingEntry && (existingEntry.cancelledAt || existingEntry.dropped)) {
+      // 再エントリー（キャンセルまたは棄権したユーザー）
+      // enteredAtを現在時刻に更新して、エントリーNo.を最後にする
       const participant = await prisma.participant.update({
         where: { id: existingEntry.id },
         data: {
-          enteredAt: new Date(),
+          enteredAt: new Date(), // 再エントリー時は現在時刻に更新（エントリーNo.が最後になる）
           isWaitlist,
           cancelledAt: null,
+          dropped: false, // 棄権フラグをリセット
+          droppedAt: null, // 棄権日時をリセット
         },
         include: {
           user: {
