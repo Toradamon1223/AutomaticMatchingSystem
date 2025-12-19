@@ -1,6 +1,6 @@
 # サーバーデプロイガイド
 
-`https://pcg-kansai-judge/Tournament` にデプロイする手順です。
+`https://pcg-kansai-judge.jp/Tournament` にデプロイする手順です。
 
 ## 前提条件
 
@@ -37,7 +37,7 @@ cd tcg-tournament-system
 cd frontend
 cat > .env << EOF
 VITE_BASE_PATH=/Tournament
-VITE_API_URL=https://pcg-kansai-judge/api
+VITE_API_URL=https://pcg-kansai-judge.jp/api
 EOF
 ```
 
@@ -49,7 +49,7 @@ cat > .env << EOF
 DATABASE_URL="postgresql://..."
 JWT_SECRET="your-secret-key"
 PORT=5000
-FRONTEND_URL="https://pcg-kansai-judge"
+FRONTEND_URL="https://pcg-kansai-judge.jp"
 EOF
 ```
 

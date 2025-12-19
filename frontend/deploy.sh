@@ -9,7 +9,7 @@ echo "=== TCG Tournament System デプロイスクリプト ==="
 
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
-export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge/api}"
+export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/api}"
 
 # フロントエンドのビルド
 echo "フロントエンドをビルド中..."
@@ -42,5 +42,5 @@ sudo chown -R www-data:www-data "$DEPLOY_DIR"
 sudo chmod -R 755 "$DEPLOY_DIR"
 
 echo "デプロイ完了！"
-echo "URL: https://pcg-kansai-judge/Tournament"
+echo "URL: https://pcg-kansai-judge.jp/Tournament"
 
