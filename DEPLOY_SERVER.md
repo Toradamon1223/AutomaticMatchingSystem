@@ -170,6 +170,8 @@ location /api {
 - HTTPS対応（X-Forwarded-Proto）
 - 静的ファイルのキャッシュ最適化
 
+**注意**: 設定ファイルを編集しても `nginx -t` でエラーが出ない場合、その設定ファイルが実際に読み込まれていない可能性があります。`/etc/nginx/nginx.conf` の `include` 設定を確認してください。
+
 設定を反映：
 
 ```bash
