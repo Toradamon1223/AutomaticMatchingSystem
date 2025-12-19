@@ -112,7 +112,7 @@ sudo chmod -R 755 /var/www/Tournament
 
 **重要**: 複数の設定ファイルが有効な場合、`judge-management-system` に設定を追加することを推奨します。
 
-既存のNginx設定ファイル（`/etc/nginx/sites-available/judge-management-system`）に以下を追加：
+既存のNginx設定ファイル（`/etc/nginx/sites-available/judge-management-system`）の `server` ブロック内に以下を追加：
 
 ```nginx
 # /Tournament パスでフロントエンドを配信
@@ -141,6 +141,12 @@ location /api {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+**重要**: 上記の詳細版の設定を使用してください。簡易版（`proxy_set_header` が少ないバージョン）でも動作する可能性はありますが、詳細版の方が以下に対応しています：
+- WebSocket接続（必要に応じて）
+- より正確なクライアントIPの取得
+- HTTPS対応（X-Forwarded-Proto）
+- 静的ファイルのキャッシュ最適化
 
 設定を反映：
 
