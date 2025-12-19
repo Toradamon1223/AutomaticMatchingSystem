@@ -107,7 +107,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
 // 大会作成
 router.post('/', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {
-    const { name, description, preliminaryRounds, tournamentSize, entryStartAt, entryEndAt, capacity, eventDate, registrationTime, startTime } = req.body
+    const { name, description, preliminaryRounds, tournamentSize, entryStartAt, entryEndAt, capacity, eventDate, registrationTime, registrationEndTime, startTime } = req.body
 
     if (!name || !preliminaryRounds || !tournamentSize) {
       return res.status(400).json({ message: '必須項目が不足しています' })
@@ -133,6 +133,7 @@ router.post('/', authenticate, requireRole('organizer', 'admin'), async (req: Au
         capacity: capacity ? parseInt(capacity) : null,
         eventDate: eventDate ? new Date(eventDate) : null,
         registrationTime: registrationTime ? new Date(registrationTime) : null,
+        registrationEndTime: registrationEndTime ? new Date(registrationEndTime) : null,
         startTime: startTime ? new Date(startTime) : null,
         status: 'DRAFT',
       },

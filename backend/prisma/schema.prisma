@@ -50,7 +50,8 @@ model Tournament {
   capacity          Int?
   // イベント情報
   eventDate         DateTime? // イベント開催日付
-  registrationTime  DateTime? // 受付時間
+  registrationTime  DateTime? // 受付開始時間
+  registrationEndTime DateTime? // 受付終了時間
   startTime         DateTime? // 大会開始時間
   startedAt         DateTime?
   completedAt       DateTime?

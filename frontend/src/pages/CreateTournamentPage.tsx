@@ -16,6 +16,7 @@ export default function CreateTournamentPage() {
   const [capacity, setCapacity] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [registrationTime, setRegistrationTime] = useState('')
+  const [registrationEndTime, setRegistrationEndTime] = useState('')
   const [startTime, setStartTime] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,6 +30,7 @@ export default function CreateTournamentPage() {
       // 日付と時間を組み合わせて送信
       let eventDateValue: string | undefined = undefined
       let registrationTimeValue: string | undefined = undefined
+      let registrationEndTimeValue: string | undefined = undefined
       let startTimeValue: string | undefined = undefined
 
       if (eventDate) {
@@ -36,6 +38,9 @@ export default function CreateTournamentPage() {
       }
       if (eventDate && registrationTime) {
         registrationTimeValue = `${eventDate}T${registrationTime}:00`
+      }
+      if (eventDate && registrationEndTime) {
+        registrationEndTimeValue = `${eventDate}T${registrationEndTime}:00`
       }
       if (eventDate && startTime) {
         startTimeValue = `${eventDate}T${startTime}:00`
@@ -51,6 +56,7 @@ export default function CreateTournamentPage() {
         capacity: capacity ? parseInt(capacity) : undefined,
         eventDate: eventDateValue,
         registrationTime: registrationTimeValue,
+        registrationEndTime: registrationEndTimeValue,
         startTime: startTimeValue,
       })
       navigate(`/tournaments/${tournament.id}/admin`)
@@ -184,11 +190,23 @@ export default function CreateTournamentPage() {
 
         <div style={{ marginBottom: '15px' }}>
           <label>
-            受付時間
+            受付開始時間
             <input
               type="time"
               value={registrationTime}
               onChange={(e) => setRegistrationTime(e.target.value)}
+              style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label>
+            受付終了時間
+            <input
+              type="time"
+              value={registrationEndTime}
+              onChange={(e) => setRegistrationEndTime(e.target.value)}
               style={{ width: '100%', padding: '8px', marginTop: '5px' }}
             />
           </label>

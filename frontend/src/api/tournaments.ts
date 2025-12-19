@@ -37,6 +37,7 @@ export const createTournament = async (data: {
   capacity?: number
   eventDate?: string
   registrationTime?: string
+  registrationEndTime?: string
   startTime?: string
 }): Promise<Tournament> => {
   const response = await apiClient.post<Tournament>('/tournaments', data)
