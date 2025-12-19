@@ -110,9 +110,12 @@ sudo chmod -R 755 /var/www/Tournament
 
 ### 4. Nginx設定
 
-**重要**: 複数の設定ファイルが有効な場合、`judge-management-system` に設定を追加することを推奨します。
+**重要**: 
+- システムによっては `/etc/nginx/sites-available/` ではなく `/etc/nginx/conf.d/` が使われている場合があります
+- 実際に使われている設定ファイルを確認: `sudo grep -r "pcg-kansai-judge" /etc/nginx/conf.d/`
+- または: `sudo nginx -T | grep -A 2 "server_name.*pcg-kansai-judge"`
 
-既存のNginx設定ファイル（`/etc/nginx/sites-available/judge-management-system`）の `server` ブロック内に以下を追加：
+既存のNginx設定ファイル（`/etc/nginx/conf.d/` または `/etc/nginx/sites-available/judge-management-system`）の `server` ブロック内に以下を追加：
 
 **重要**: `location /Tournament` は `location /` より**前に**配置する必要があります。既存のJudge Systemの設定が `location /` で全てをキャッチしている場合、`/Tournament` の設定が無視されます。
 
