@@ -276,10 +276,23 @@ pm2 restart tcg-backend
 
 ## トラブルシューティング
 
-### 404エラーが表示される
+### 404エラーが表示される、またはJudge Systemの画面が表示される
 
+- `/var/www/Tournament/index.html` が存在するか確認: `ls -la /var/www/Tournament/index.html`
+- フロントエンドが正しくビルド・配置されているか確認: `ls -la /var/www/Tournament/`
+- フロントエンドを再ビルドして配置:
+  ```bash
+  cd /var/www/Tournament/frontend
+  export VITE_BASE_PATH="/Tournament"
+  export VITE_API_URL="https://pcg-kansai-judge.jp/api"
+  npm run build
+  cd /var/www/Tournament
+  sudo rm -rf *.html *.js *.css assets 2>/dev/null || true
+  sudo cp -r frontend/dist/* .
+  sudo chown -R www-data:www-data /var/www/Tournament
+  ```
 - Nginx設定で `try_files` が正しく設定されているか確認
-- `/Tournament/index.html` が存在するか確認
+- Nginxをリロード: `sudo systemctl reload nginx`
 
 ### API接続エラー
 
