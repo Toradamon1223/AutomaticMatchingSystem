@@ -168,6 +168,29 @@ sudo systemctl reload nginx
 
 ### 5. バックエンドのデプロイ（同じサーバーにデプロイする場合）
 
+プロジェクトを `/var/www/Tournament/` に直接配置する場合：
+
+```bash
+cd /var/www/Tournament/backend
+
+# 依存関係のインストール
+npm install
+
+# Prismaクライアントの生成
+npx prisma generate
+
+# ビルド
+npm run build
+
+# PM2でプロセス管理（推奨）
+sudo npm install -g pm2
+pm2 start dist/index.js --name tcg-backend
+pm2 save
+pm2 startup  # システム起動時に自動起動する設定
+```
+
+別の場所にソースコードを置く場合：
+
 ```bash
 cd /var/www/tcg-tournament-system/backend
 
