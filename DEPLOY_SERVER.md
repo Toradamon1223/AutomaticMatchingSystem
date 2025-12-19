@@ -117,14 +117,14 @@ sudo chmod -R 755 /var/www/Tournament
 **重要**: `location /Tournament` は `location /` より**前に**配置する必要があります。既存のJudge Systemの設定が `location /` で全てをキャッチしている場合、`/Tournament` の設定が無視されます。
 
 ```nginx
-# /Tournament パスでフロントエンドを配信（location / より前に配置）
+# /Tournament パスでフロントエンドを配信（^~ で確実に優先評価）
 # /Tournament にアクセスしたときに /Tournament/ にリダイレクト
 location = /Tournament {
     return 301 /Tournament/;
 }
 
-# /Tournament/ でファイルを配信（root を使用 - より確実）
-location /Tournament/ {
+# /Tournament/ でファイルを配信（^~ で location / より優先）
+location ^~ /Tournament/ {
     root /var/www;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
