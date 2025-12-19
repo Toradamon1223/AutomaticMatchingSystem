@@ -118,8 +118,14 @@ sudo chmod -R 755 /var/www/Tournament
 
 ```nginx
 # /Tournament パスでフロントエンドを配信（location / より前に配置）
-location /Tournament {
-    alias /var/www/Tournament;
+# /Tournament にアクセスしたときに /Tournament/ にリダイレクト
+location = /Tournament {
+    return 301 /Tournament/;
+}
+
+# /Tournament/ でファイルを配信
+location /Tournament/ {
+    alias /var/www/Tournament/;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
     
