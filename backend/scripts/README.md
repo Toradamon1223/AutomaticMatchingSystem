@@ -1,5 +1,33 @@
 # スクリプト一覧
 
+## generate-jwt-secret.js
+
+JWT_SECRETを生成するスクリプトです。
+
+### 使い方
+
+```bash
+cd backend
+node scripts/generate-jwt-secret.js
+```
+
+生成された文字列を`.env`ファイルの`JWT_SECRET`に設定してください。
+
+### 例
+
+```bash
+$ node scripts/generate-jwt-secret.js
+
+=== JWT_SECRET生成 ===
+
+以下の文字列を.envファイルのJWT_SECRETに設定してください:
+
+a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2
+
+例:
+JWT_SECRET="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2"
+```
+
 ## reset-admin-password.js
 
 Adminユーザーのパスワードをリセットするスクリプトです。
