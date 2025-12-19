@@ -126,7 +126,11 @@ location = /Tournament {
 }
 
 # /Tournament でファイルを配信（^~ で確実に優先、完全に分離）
-# 重要: ^~ 修飾子を使用し、末尾のスラッシュなしでマッチさせる
+# 重要: 
+# 1. ^~ 修飾子を使用
+# 2. alias を使用（root ではなく）
+# 3. location / の直前に配置
+# 4. 末尾のスラッシュなしでマッチさせる
 location ^~ /Tournament {
     alias /var/www/Tournament;
     index index.html;
