@@ -111,11 +111,11 @@ sudo chmod -R 755 /var/www/Tournament
 ### 4. Nginx設定
 
 **重要**: 
-- システムによっては `/etc/nginx/sites-available/` ではなく `/etc/nginx/conf.d/` が使われている場合があります
 - 実際に使われている設定ファイルを確認: `sudo grep -r "pcg-kansai-judge" /etc/nginx/conf.d/`
-- または: `sudo nginx -T | grep -A 2 "server_name.*pcg-kansai-judge"`
+- 通常は `/etc/nginx/conf.d/judge-management-system.conf` が使われています
+- **`/etc/nginx/sites-available/judge-management-system` ではなく、`/etc/nginx/conf.d/judge-management-system.conf` を編集してください**
 
-既存のNginx設定ファイル（`/etc/nginx/conf.d/` または `/etc/nginx/sites-available/judge-management-system`）の `server` ブロック内に以下を追加：
+既存のNginx設定ファイル（`/etc/nginx/conf.d/judge-management-system.conf`）の `server` ブロック内に以下を追加：
 
 **重要**: `location /Tournament` は `location /` より**前に**配置する必要があります。既存のJudge Systemの設定が `location /` で全てをキャッチしている場合、`/Tournament` の設定が無視されます。
 
@@ -179,16 +179,10 @@ location /api {
 
 ```bash
 # バックアップを取る（推奨）
-sudo cp /etc/nginx/sites-available/judge-management-system /etc/nginx/sites-available/judge-management-system.backup
+sudo cp /etc/nginx/conf.d/judge-management-system.conf /etc/nginx/conf.d/judge-management-system.conf.backup
 
-# 設定ファイルを編集
-sudo nano /etc/nginx/sites-available/judge-management-system
-
-# sites-enabled にリンクされているか確認
-ls -la /etc/nginx/sites-enabled/ | grep judge-management-system
-
-# リンクされていない場合は作成
-sudo ln -sf /etc/nginx/sites-available/judge-management-system /etc/nginx/sites-enabled/judge-management-system
+# 設定ファイルを編集（重要: conf.d/judge-management-system.conf を編集）
+sudo nano /etc/nginx/conf.d/judge-management-system.conf
 
 # 設定をテスト
 sudo nginx -t  # 設定ファイルの構文チェック
