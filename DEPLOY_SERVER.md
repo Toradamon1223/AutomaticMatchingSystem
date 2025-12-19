@@ -118,9 +118,16 @@ sudo chmod -R 755 /var/www/Tournament
 
 ```nginx
 # /Tournament パスでフロントエンドを配信
-# 正規表現で確実にマッチさせる（推奨）
-location ~ ^/Tournament(/.*)?$ {
-    alias /var/www/Tournament;
+# 重要: location / の直前に配置すること
+
+# /Tournament にアクセスしたときに /Tournament/ にリダイレクト
+location = /Tournament {
+    return 301 /Tournament/;
+}
+
+# /Tournament/ でファイルを配信（location / より前に確実に配置）
+location /Tournament/ {
+    root /var/www;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
     
@@ -130,6 +137,8 @@ location ~ ^/Tournament(/.*)?$ {
         add_header Cache-Control "public, immutable";
     }
 }
+
+# この後に location / { ... } を配置
 
 # APIプロキシ設定（location / より前に配置）
 location /api {
