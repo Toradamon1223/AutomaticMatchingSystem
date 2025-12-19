@@ -86,3 +86,40 @@ cd backend
 node scripts/create-test-users.js
 ```
 
+## encode-password.js
+
+データベースパスワードをURLエンコードするスクリプトです。パスワードに`@`などの特殊文字が含まれている場合に使用します。
+
+### 使い方
+
+```bash
+cd backend
+node scripts/encode-password.js
+```
+
+### 例
+
+パスワードが`@KusKus1223`の場合：
+
+```bash
+$ node scripts/encode-password.js
+
+パスワードを入力してください: @KusKus1223
+
+=== URLエンコード結果 ===
+
+元のパスワード: @KusKus1223
+エンコード後: %40KusKus1223
+
+DATABASE_URLの例:
+postgresql://postgres:%40KusKus1223@[PROJECT-REF].supabase.co:5432/postgres?pgbouncer=true
+
+注意: @ は %40 に変換されます
+```
+
+### 重要な注意点
+
+- `@`は`%40`に変換されます
+- その他の特殊文字（`#`, `%`, `&`, `=`など）も自動的にエンコードされます
+- エンコード後の文字列を`DATABASE_URL`の`[PASSWORD]`部分に使用してください
+
