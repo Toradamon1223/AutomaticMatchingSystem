@@ -227,6 +227,9 @@ pm2 startup  # システム起動時に自動起動する設定
 ```bash
 cd /var/www/Tournament
 
+# Git所有権の問題を解決（初回のみ、必要に応じて）
+git config --global --add safe.directory /var/www/Tournament
+
 # 最新のコードを取得
 git pull
 
