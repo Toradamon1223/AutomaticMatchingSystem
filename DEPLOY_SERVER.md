@@ -125,10 +125,10 @@ location = /Tournament {
     return 301 /Tournament/;
 }
 
-# /Tournament/ でファイルを配信（^~ で確実に優先、location / より前に配置）
-# 重要: ^~ 修飾子を必ず使用すること
+# /Tournament/ でファイルを配信（^~ で確実に優先、alias を使用）
+# 重要: ^~ 修飾子と alias を必ず使用すること
 location ^~ /Tournament/ {
-    root /var/www;
+    alias /var/www/Tournament/;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
     
