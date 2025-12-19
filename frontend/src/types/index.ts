@@ -25,6 +25,7 @@ export interface Tournament {
   capacity?: number
   eventDate?: string
   registrationTime?: string
+  registrationEndTime?: string
   startTime?: string
   createdAt: string
   startedAt?: string
