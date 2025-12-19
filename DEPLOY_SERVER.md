@@ -114,8 +114,10 @@ sudo chmod -R 755 /var/www/Tournament
 
 既存のNginx設定ファイル（`/etc/nginx/sites-available/judge-management-system`）の `server` ブロック内に以下を追加：
 
+**重要**: `location /Tournament` は `location /` より**前に**配置する必要があります。既存のJudge Systemの設定が `location /` で全てをキャッチしている場合、`/Tournament` の設定が無視されます。
+
 ```nginx
-# /Tournament パスでフロントエンドを配信
+# /Tournament パスでフロントエンドを配信（location / より前に配置）
 location /Tournament {
     alias /var/www/Tournament;
     index index.html;
@@ -128,7 +130,7 @@ location /Tournament {
     }
 }
 
-# APIプロキシ設定
+# APIプロキシ設定（location / より前に配置）
 location /api {
     proxy_pass http://localhost:5000;
     proxy_http_version 1.1;
@@ -140,6 +142,11 @@ location /api {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 }
+
+# 既存のJudge Systemの設定（location / は最後に配置）
+# location / {
+#     ...
+# }
 ```
 
 **重要**: 上記の詳細版の設定を使用してください。簡易版（`proxy_set_header` が少ないバージョン）でも動作する可能性はありますが、詳細版の方が以下に対応しています：
