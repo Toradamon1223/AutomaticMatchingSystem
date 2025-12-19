@@ -824,8 +824,8 @@ router.post('/:id/rounds/:round/rematch', authenticate, requireRole('organizer',
   }
 })
 
-// 勝ち点修正（結果変更）
-router.patch('/:id/matches/:matchId/points', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+// 勝ち点修正（結果変更）- 管理者のみ
+router.patch('/:id/matches/:matchId/points', authenticate, requireRole('admin'), async (req: AuthRequest, res) => {
   try {
     const { result } = req.body
     const match = await prisma.match.findUnique({
