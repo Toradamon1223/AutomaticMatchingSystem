@@ -179,11 +179,20 @@ sudo cp /etc/nginx/sites-available/judge-management-system /etc/nginx/sites-avai
 # 設定ファイルを編集
 sudo nano /etc/nginx/sites-available/judge-management-system
 
+# sites-enabled にリンクされているか確認
+ls -la /etc/nginx/sites-enabled/ | grep judge-management-system
+
+# リンクされていない場合は作成
+sudo ln -sf /etc/nginx/sites-available/judge-management-system /etc/nginx/sites-enabled/judge-management-system
+
 # 設定をテスト
 sudo nginx -t  # 設定ファイルの構文チェック
 
-# Nginxをリロード
-sudo systemctl reload nginx
+# Nginxを再起動（reload ではなく restart）
+sudo systemctl restart nginx
+
+# 設定が読み込まれているか確認
+sudo nginx -T | grep -i "tournament"
 ```
 
 **注意**: 複数の設定ファイルが有効な場合（`default` と `judge-management-system` の両方）、`judge-management-system` に追加することを推奨します。`server_name` の設定によって、どちらの設定が適用されるかが決まります。
