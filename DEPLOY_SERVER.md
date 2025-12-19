@@ -314,6 +314,26 @@ pm2 restart tcg-backend
 - Nginxの `/api` プロキシ設定が正しいか確認
 - バックエンドのCORS設定で `FRONTEND_URL` が正しく設定されているか確認
 
+### Judge Systemの画面が表示される、または /login にリダイレクトされる
+
+**原因**: Judge Systemのアプリケーション側で `/Tournament` パスを処理している可能性があります。
+
+**確認方法**:
+1. 別のパス（例: `/tournament-test/`）でテスト:
+   ```nginx
+   location ^~ /tournament-test/ {
+       alias /var/www/Tournament/;
+       index index.html;
+       try_files $uri $uri/ /tournament-test/index.html;
+   }
+   ```
+2. `/tournament-test/` で動作すれば、Judge System側の問題の可能性が高い
+3. Judge Systemのルーティング設定を確認（Next.jsの場合は `next.config.js` など）
+
+**解決方法**:
+- Judge Systemのアプリケーション側で `/Tournament` パスを除外する設定を追加
+- または、完全に別のサブドメインを使用する
+
 ### 静的ファイルが読み込めない
 
 - `/var/www/Tournament` の権限を確認
