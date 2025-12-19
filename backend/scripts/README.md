@@ -1,5 +1,42 @@
 # スクリプト一覧
 
+## test-database-connection.js
+
+データベース接続をテストするスクリプトです。接続エラーが発生した場合に使用します。
+
+### 使い方
+
+```bash
+cd backend
+node scripts/test-database-connection.js
+```
+
+### 機能
+
+- DATABASE_URLの確認（パスワード部分は隠して表示）
+- データベースへの接続テスト
+- ユーザー数の確認
+- Adminユーザーの一覧表示
+
+### 例
+
+```bash
+$ node scripts/test-database-connection.js
+
+=== データベース接続テスト ===
+
+DATABASE_URL: postgresql://postgres:***@db.wzktmwufngrdbuxnorqd.supabase.co:5432/postgres?pgbouncer=true
+
+接続を試みています...
+✅ 接続成功！
+
+クエリをテストしています...
+✅ ユーザー数: 5
+
+✅ Adminユーザーが見つかりました:
+   1. 管理者 (admin@example.com)
+```
+
 ## generate-jwt-secret.js
 
 JWT_SECRETを生成するスクリプトです。
