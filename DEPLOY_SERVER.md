@@ -125,13 +125,13 @@ location = /Tournament {
     return 301 /Tournament/;
 }
 
-# /Tournament/ でファイルを配信（^~ で確実に優先、alias を使用）
-# 重要: ^~ 修飾子と alias を必ず使用すること
-location ^~ /Tournament/ {
-    alias /var/www/Tournament/;
+# /Tournament でファイルを配信（^~ で確実に優先、完全に分離）
+# 重要: ^~ 修飾子を使用し、末尾のスラッシュなしでマッチさせる
+location ^~ /Tournament {
+    alias /var/www/Tournament;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
-    
+
     # 静的ファイルのキャッシュ設定
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
