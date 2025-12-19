@@ -824,12 +824,136 @@ router.post('/:id/rounds/:round/rematch', authenticate, requireRole('organizer',
   }
 })
 
-// 勝ち点修正
+// 勝ち点修正（結果変更）
 router.patch('/:id/matches/:matchId/points', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {
-    const { player1Points, player2Points } = req.body
-    // 実装は省略（必要に応じて追加）
-    res.json({ message: '勝ち点修正機能は実装中です' })
+    const { result } = req.body
+    const match = await prisma.match.findUnique({
+      where: { id: req.params.matchId },
+      include: {
+        player1: true,
+        player2: true,
+        tournament: true,
+      },
+    })
+
+    if (!match) {
+      return res.status(404).json({ message: '対戦が見つかりません' })
+    }
+
+    if (match.tournamentId !== req.params.id) {
+      return res.status(400).json({ message: '無効なリクエストです' })
+    }
+
+    if (!result || !['player1', 'player2', 'draw'].includes(result.toLowerCase())) {
+      return res.status(400).json({ message: '有効な結果を指定してください（player1, player2, draw）' })
+    }
+
+    const newResult = result.toUpperCase() as 'PLAYER1' | 'PLAYER2' | 'DRAW'
+    const oldResult = match.result
+
+    // 既存の結果がある場合、勝ち点を減算
+    if (oldResult) {
+      const oldPlayer1Wins = oldResult === 'PLAYER1' ? 1 : 0
+      const oldPlayer1Losses = oldResult === 'PLAYER2' ? 1 : 0
+      const oldPlayer1Draws = oldResult === 'DRAW' ? 1 : 0
+      const oldPlayer1Points = oldResult === 'PLAYER1' ? 3 : oldResult === 'DRAW' ? 1 : 0
+
+      const oldPlayer2Wins = oldResult === 'PLAYER2' ? 1 : 0
+      const oldPlayer2Losses = oldResult === 'PLAYER1' ? 1 : 0
+      const oldPlayer2Draws = oldResult === 'DRAW' ? 1 : 0
+      const oldPlayer2Points = oldResult === 'PLAYER2' ? 3 : oldResult === 'DRAW' ? 1 : 0
+
+      // 既存の勝ち点を減算
+      await prisma.participant.update({
+        where: { id: match.player1Id },
+        data: {
+          wins: { decrement: oldPlayer1Wins },
+          losses: { decrement: oldPlayer1Losses },
+          draws: { decrement: oldPlayer1Draws },
+          points: { decrement: oldPlayer1Points },
+        },
+      })
+
+      await prisma.participant.update({
+        where: { id: match.player2Id },
+        data: {
+          wins: { decrement: oldPlayer2Wins },
+          losses: { decrement: oldPlayer2Losses },
+          draws: { decrement: oldPlayer2Draws },
+          points: { decrement: oldPlayer2Points },
+        },
+      })
+    }
+
+    // 新しい結果を設定
+    const updatedMatch = await prisma.match.update({
+      where: { id: req.params.matchId },
+      data: {
+        result: newResult,
+        reportedBy: req.userId!,
+        reportedAt: new Date(),
+      },
+      include: {
+        player1: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        player2: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // 新しい勝ち点を加算
+    const newPlayer1Wins = newResult === 'PLAYER1' ? 1 : 0
+    const newPlayer1Losses = newResult === 'PLAYER2' ? 1 : 0
+    const newPlayer1Draws = newResult === 'DRAW' ? 1 : 0
+    const newPlayer1Points = newResult === 'PLAYER1' ? 3 : newResult === 'DRAW' ? 1 : 0
+
+    const newPlayer2Wins = newResult === 'PLAYER2' ? 1 : 0
+    const newPlayer2Losses = newResult === 'PLAYER1' ? 1 : 0
+    const newPlayer2Draws = newResult === 'DRAW' ? 1 : 0
+    const newPlayer2Points = newResult === 'PLAYER2' ? 3 : newResult === 'DRAW' ? 1 : 0
+
+    await prisma.participant.update({
+      where: { id: match.player1Id },
+      data: {
+        wins: { increment: newPlayer1Wins },
+        losses: { increment: newPlayer1Losses },
+        draws: { increment: newPlayer1Draws },
+        points: { increment: newPlayer1Points },
+      },
+    })
+
+    await prisma.participant.update({
+      where: { id: match.player2Id },
+      data: {
+        wins: { increment: newPlayer2Wins },
+        losses: { increment: newPlayer2Losses },
+        draws: { increment: newPlayer2Draws },
+        points: { increment: newPlayer2Points },
+      },
+    })
+
+    // 順位を再計算
+    await calculateStandings(req.params.id)
+
+    const transformedMatch = transformMatch(updatedMatch)
+    res.json(transformedMatch)
   } catch (error) {
     console.error('Update points error:', error)
     res.status(500).json({ message: '勝ち点の更新に失敗しました' })

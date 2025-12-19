@@ -132,7 +132,15 @@ export async function generatePairings(tournamentId: string, round: number): Pro
 
     // ペアが見つからなかった場合（奇数人数）
     if (!paired && !used.has(participants[i].id)) {
-      // バイ（不戦勝）として扱う（実装は省略）
+      // バイ（不戦勝）として扱う
+      // バイの場合は自動的に勝ち点が加算される
+      await prisma.participant.update({
+        where: { id: participants[i].id },
+        data: {
+          wins: { increment: 1 },
+          points: { increment: 3 },
+        },
+      })
     }
   }
 
