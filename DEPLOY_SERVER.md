@@ -193,6 +193,10 @@ sudo systemctl restart nginx
 
 # 設定が読み込まれているか確認
 sudo nginx -T | grep -i "tournament"
+
+# もし表示されない場合、設定ファイルの構文エラーを確認
+sudo nginx -t
+# エラーがあれば修正してから再起動
 ```
 
 **注意**: 複数の設定ファイルが有効な場合（`default` と `judge-management-system` の両方）、`judge-management-system` に追加することを推奨します。`server_name` の設定によって、どちらの設定が適用されるかが決まります。
