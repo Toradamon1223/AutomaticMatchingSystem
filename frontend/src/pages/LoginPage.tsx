@@ -19,7 +19,14 @@ export default function LoginPage() {
       await login(email, password)
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'ログインに失敗しました')
+      console.error('Login error:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'ログインに失敗しました'
+      setError(errorMessage)
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      })
     } finally {
       setLoading(false)
     }
