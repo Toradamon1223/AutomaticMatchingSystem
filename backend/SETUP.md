@@ -109,3 +109,23 @@ npx prisma studio
 
 ブラウザで `http://localhost:5555` が開きます。
 
+## ユーティリティスクリプト
+
+### Adminユーザーのパスワードリセット
+
+パスワードを忘れた場合、以下のスクリプトでリセットできます：
+
+```bash
+cd backend
+node scripts/reset-admin-password.js
+```
+
+実行すると、Adminユーザー一覧が表示され、パスワードをリセットするユーザーを選択できます。
+
+### その他のスクリプト
+
+- `scripts/make-admin.js` - 最初のユーザーを管理者にする
+- `scripts/create-test-users.js` - テストユーザーを作成する
+
+詳細は `backend/scripts/README.md` を参照してください。
+
