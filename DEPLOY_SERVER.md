@@ -125,9 +125,9 @@ location = /Tournament {
     return 301 /Tournament/;
 }
 
-# /Tournament/ でファイルを配信（location / より前に確実に配置）
-# 方法1: 通常のprefix location（推奨）
-location /Tournament/ {
+# /Tournament/ でファイルを配信（^~ で確実に優先、location / より前に配置）
+# 重要: ^~ 修飾子を必ず使用すること
+location ^~ /Tournament/ {
     root /var/www;
     index index.html;
     try_files $uri $uri/ /Tournament/index.html;
@@ -138,13 +138,6 @@ location /Tournament/ {
         add_header Cache-Control "public, immutable";
     }
 }
-
-# 方法2: 上記が動作しない場合、^~ 修飾子を使う
-# location ^~ /Tournament/ {
-#     root /var/www;
-#     index index.html;
-#     try_files $uri $uri/ /Tournament/index.html;
-# }
 
 # この後に location / { ... } を配置
 
