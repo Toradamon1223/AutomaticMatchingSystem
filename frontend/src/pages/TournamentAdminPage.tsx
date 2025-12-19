@@ -8,7 +8,6 @@ import {
   getMatches,
   startTournament,
   generatePairings,
-  updateMatchPoints,
   dropParticipant,
   rematchRound,
 } from '../api/tournaments'

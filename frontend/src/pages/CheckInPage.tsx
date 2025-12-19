@@ -50,7 +50,7 @@ export default function CheckInPage() {
             setError(err.response?.data?.message || 'チェックインに失敗しました')
           }
         },
-        (errorMessage) => {
+        (_errorMessage) => {
           // スキャンエラーは無視（継続スキャン）
         }
       )

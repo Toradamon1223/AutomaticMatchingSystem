@@ -157,7 +157,6 @@ export default function TournamentDetailPage() {
   }
 
   const isParticipant = participants.some((p) => p.userId === user?.id && !p.cancelledAt)
-  const myParticipant = participants.find((p) => p.userId === user?.id)
 
   return (
     <div>
