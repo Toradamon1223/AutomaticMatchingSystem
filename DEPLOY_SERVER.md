@@ -320,23 +320,38 @@ pm2 restart tcg-backend
 
 ### Judge Systemの画面が表示される、または /login にリダイレクトされる
 
-**原因**: Judge Systemのアプリケーション側で `/Tournament` パスを処理している可能性があります。
+**原因**: 
+1. Nginx設定が正しく読み込まれていない
+2. `location /Tournament` が `location /` より後に配置されている
+3. Judge Systemのアプリケーション側で `/Tournament` パスを処理している
 
 **確認方法**:
-1. 別のパス（例: `/tournament-test/`）でテスト:
+1. 設定が読み込まれているか確認:
+   ```bash
+   sudo nginx -T | grep -i "tournament"
+   # 何も表示されない場合は、設定が読み込まれていない
+   ```
+
+2. location設定の順序を確認:
+   ```bash
+   sudo grep -n "location" /etc/nginx/sites-available/judge-management-system
+   # location /Tournament が location / より前（行番号が小さい）であることを確認
+   ```
+
+3. 別のパス（例: `/tournament-test/`）でテスト:
    ```nginx
-   location ^~ /tournament-test/ {
-       alias /var/www/Tournament/;
+   location ^~ /tournament-test {
+       alias /var/www/Tournament;
        index index.html;
        try_files $uri $uri/ /tournament-test/index.html;
    }
    ```
-2. `/tournament-test/` で動作すれば、Judge System側の問題の可能性が高い
-3. Judge Systemのルーティング設定を確認（Next.jsの場合は `next.config.js` など）
 
 **解決方法**:
-- Judge Systemのアプリケーション側で `/Tournament` パスを除外する設定を追加
-- または、完全に別のサブドメインを使用する
+1. 設定ファイルで `location ^~ /Tournament` を `location /` の**直前に**配置
+2. `root` ではなく `alias` を使用
+3. 設定を反映: `sudo nginx -t && sudo systemctl restart nginx`
+4. Judge Systemのアプリケーション側で `/Tournament` パスを除外する設定を追加（Next.jsの場合は `middleware.ts` など）
 
 ### 静的ファイルが読み込めない
 
