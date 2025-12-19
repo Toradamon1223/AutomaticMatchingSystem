@@ -127,13 +127,18 @@ location = /Tournament {
 location /Tournament/ {
     alias /var/www/Tournament/;
     index index.html;
-    try_files $uri $uri/ /Tournament/index.html;
+    try_files $uri $uri/ @tournament_fallback;
     
     # 静的ファイルのキャッシュ設定
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
+}
+
+# Tournament用のフォールバック
+location @tournament_fallback {
+    rewrite ^/Tournament/(.*)$ /Tournament/index.html last;
 }
 
 # APIプロキシ設定（location / より前に配置）
