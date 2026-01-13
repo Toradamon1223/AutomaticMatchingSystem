@@ -186,6 +186,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     }
 
     // 同じ勝敗数グループ内でランダムにマッチング
+    let matchesInThisGroup = 0
     while (group.length >= 2) {
       const player1 = group.shift()!
       if (used.has(player1.id)) continue
