@@ -139,6 +139,12 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     recordGroups.get(record)!.push(participant)
   }
 
+  // デバッグ: 各グループの人数をログ出力
+  console.log(`[generatePairings] Round ${round}: Record groups:`)
+  for (const [record, group] of recordGroups.entries()) {
+    console.log(`  ${record}: ${group.length} participants`)
+  }
+
   // 勝敗数の降順でソート（2-0 > 1-1 > 0-2 など）
   const sortedRecords = Array.from(recordGroups.keys()).sort((a, b) => {
     const [winsA, lossesA] = a.split('-').map(Number)
@@ -150,10 +156,14 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     return lossesA - lossesB
   })
 
+  console.log(`[generatePairings] Round ${round}: Sorted records:`, sortedRecords)
+
   // 各勝敗数グループでマッチング
   for (let recordIdx = 0; recordIdx < sortedRecords.length; recordIdx++) {
     const record = sortedRecords[recordIdx]
     let group = recordGroups.get(record)!.filter(p => !used.has(p.id))
+    
+    console.log(`[generatePairings] Round ${round}: Processing record ${record}, ${group.length} participants (after filtering used)`)
     
     // グループをシャッフル（ランダム化）
     for (let i = group.length - 1; i > 0; i--) {
@@ -230,6 +240,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         used.add(player2.id)
         group.splice(i, 1) // マッチした相手をグループから削除
         paired = true
+        matchesInThisGroup++
         break
       }
 
@@ -287,6 +298,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
             nextGroup.splice(j, 1) // マッチした相手をグループから削除
             recordGroups.set(nextRecord, nextGroup)
             foundOpponent = true
+            matchesInThisGroup++
             break
           }
           
@@ -346,9 +358,12 @@ export async function generatePairings(tournamentId: string, round: number): Pro
             },
           })
           used.add(player1.id)
+          matchesInThisGroup++
         }
       }
     }
+    
+    console.log(`[generatePairings] Round ${round}: Record ${record} - Created ${matchesInThisGroup} matches, ${group.length} participants remaining`)
 
     // グループが奇数人数で残った場合、最後の1人をBYEとして処理
     if (group.length === 1) {
