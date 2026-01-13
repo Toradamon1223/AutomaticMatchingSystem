@@ -181,7 +181,8 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         const movedPlayer = group.pop()!
         nextGroup.unshift(movedPlayer) // 先頭に追加
         recordGroups.set(nextRecord, nextGroup)
-        group = [] // 元のグループは空になる
+        // groupは空にならない（残りの偶数人数でマッチングを続ける）
+        console.log(`[generatePairings] Round ${round}: Record ${record} - Moved 1 player to ${nextRecord}, ${group.length} participants remaining`)
       }
     }
 
