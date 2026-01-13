@@ -342,16 +342,24 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
 
   // 各参加者のOMWと平均OMWを計算（バッチ更新で最適化）
   const updatePromises = participants.map(async (participant) => {
+    // バイの試合（player1Id === player2Id）を除外してマッチを取得
     const allMatches = [
-      ...participant.matchesAsPlayer1.map((m) => ({
-        opponent: m.player2,
-        result: m.result,
-      })),
-      ...participant.matchesAsPlayer2.map((m) => ({
-        opponent: m.player1,
-        result: m.result === 'PLAYER1' ? 'PLAYER2' : m.result === 'PLAYER2' ? 'PLAYER1' : 'DRAW',
-      })),
+      ...participant.matchesAsPlayer1
+        .filter((m) => m.player1Id !== m.player2Id) // バイの試合を除外
+        .map((m) => ({
+          opponent: m.player2,
+          result: m.result,
+        })),
+      ...participant.matchesAsPlayer2
+        .filter((m) => m.player1Id !== m.player2Id) // バイの試合を除外
+        .map((m) => ({
+          opponent: m.player1,
+          result: m.result === 'PLAYER1' ? 'PLAYER2' : m.result === 'PLAYER2' ? 'PLAYER1' : 'DRAW',
+        })),
     ]
+    
+    // バイの試合をカウント（player1Id === player2Id の試合）
+    const byeMatches = participant.matchesAsPlayer1.filter((m) => m.player1Id === m.player2Id)
 
     // 実際のマッチ結果からwins, losses, draws, pointsを再計算
     let wins = 0
@@ -359,6 +367,7 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
     let draws = 0
     let points = 0
 
+    // 通常の試合をカウント
     for (const match of allMatches) {
       const result = match.result?.toUpperCase()
       if (result === 'PLAYER1') {
@@ -372,6 +381,10 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       }
       // BOTH_LOSSの場合は何も加算しない
     }
+    
+    // バイの試合をカウント（バイを受けたプレイヤーは自動的に勝利）
+    wins += byeMatches.length
+    points += byeMatches.length * 3
 
     // OMW%計算（対戦相手のマッチ勝率の平均）
     // 各対戦相手のMW% = 対戦相手のマッチポイント / (対戦相手の総試合数 × 3)
