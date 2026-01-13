@@ -40,14 +40,19 @@ export default function DashboardPage() {
   const getTournamentStatusText = (tournament: Tournament) => {
     const now = new Date()
 
-    // 大会終了
+    // 結果発表
     if (tournament.status === 'completed') {
-      return '大会終了'
+      return '結果発表'
     }
 
-    // 開催中
+    // 大会開催中
     if (tournament.status === 'in_progress') {
-      return '開催中'
+      return '大会開催中'
+    }
+
+    // 大会開催準備中
+    if (tournament.status === 'preparing') {
+      return '大会開催準備中'
     }
 
     // エントリー期間の判定
@@ -56,12 +61,12 @@ export default function DashboardPage() {
       const entryEnd = new Date(tournament.entryEndAt)
 
       if (now < entryStart) {
-        return 'エントリー期間前'
+        return 'エントリー開始前'
       }
       if (now >= entryStart && now <= entryEnd) {
         return 'エントリー受付中'
       }
-      if (now > entryEnd && tournament.status === 'registration') {
+      if (now > entryEnd) {
         return 'エントリー締め切り'
       }
     }
@@ -71,7 +76,11 @@ export default function DashboardPage() {
       return 'エントリー受付中'
     }
 
-    // 準備中
+    // エントリー開始前（デフォルト）
+    if (tournament.status === 'draft') {
+      return 'エントリー開始前'
+    }
+
     return '準備中'
   }
 
@@ -97,6 +106,9 @@ export default function DashboardPage() {
     if (tournament.status === 'in_progress') {
       return '#4CAF50'
     }
+    if (tournament.status === 'preparing') {
+      return '#9C27B0'
+    }
     if (participant.isWaitlist) {
       return '#FF9800'
     }
@@ -106,6 +118,27 @@ export default function DashboardPage() {
   return (
     <div>
       <p>ようこそ、{user?.name}さん</p>
+
+      {/* 大会作成ボタン（主催者または管理者のみ） */}
+      {(user?.role === 'organizer' || user?.role === 'admin') && (
+        <div style={{ marginTop: '20px', marginBottom: '30px' }}>
+          <Link
+            to="/tournaments/new"
+            style={{
+              display: 'inline-block',
+              padding: '12px 24px',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '6px',
+              fontWeight: 'bold',
+              fontSize: '16px',
+            }}
+          >
+            + 新しい大会を作成
+          </Link>
+        </div>
+      )}
 
       <div style={{ marginTop: '30px' }}>
         <h2>参加した大会</h2>

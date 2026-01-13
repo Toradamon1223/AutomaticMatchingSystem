@@ -1,6 +1,6 @@
 import { Tournament as PrismaTournament } from '@prisma/client'
 
-export function transformTournament(tournament: PrismaTournament & { organizer?: any }) {
+export function transformTournament(tournament: PrismaTournament & { organizer?: any; participants?: any[] }) {
   let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
   try {
     const parsed = JSON.parse(tournament.preliminaryRounds)
@@ -15,9 +15,13 @@ export function transformTournament(tournament: PrismaTournament & { organizer?:
     preliminaryRounds = tournament.preliminaryRounds as any
   }
 
+  // participantsを除外して返す（必要に応じて別途取得）
+  const tournamentObj = tournament as any
+  const { participants, matches, ...tournamentWithoutRelations } = tournamentObj
+
   return {
-    ...tournament,
-    status: tournament.status.toLowerCase() as 'draft' | 'registration' | 'in_progress' | 'completed',
+    ...tournamentWithoutRelations,
+    status: tournament.status.toLowerCase() as 'draft' | 'registration' | 'preparing' | 'in_progress' | 'completed',
     preliminaryRounds,
   }
 }

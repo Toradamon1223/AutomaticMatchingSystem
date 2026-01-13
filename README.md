@@ -136,7 +136,7 @@ tcg-tournament-system/
 - 勝敗結果登録
 
 ### 開催者機能
-- 大会作成
+- 大会作成（ロゴ画像、会場情報、参加費など）
 - 大会開始
 - マッチング生成
 - 再マッチング
@@ -147,6 +147,23 @@ tcg-tournament-system/
 - 全機能へのアクセス
 - ユーザー管理
 - 役割変更
+
+## 自動化スクリプト
+
+機能追加や変更があった時に、バックエンドサーバーを再起動してPrisma Clientを再生成する自動化スクリプトがあります。
+
+### バックエンド再起動（Prisma Client再生成含む）
+
+```bash
+# ルートディレクトリから実行（推奨）
+npm run restart:backend
+
+# または、バックエンドディレクトリから
+cd backend
+npm run restart:with-prisma
+```
+
+詳細は [`README_AUTOMATION.md`](./README_AUTOMATION.md) を参照してください。
 
 ## オポネント方式の順位決定
 

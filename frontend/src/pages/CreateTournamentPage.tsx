@@ -2,11 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createTournament } from '../api/tournaments'
 import BackButton from '../components/BackButton'
+import VenueAutocomplete from '../components/VenueAutocomplete'
+import { combineDateAndTime } from '../utils/dateUtils'
 
 export default function CreateTournamentPage() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [logoImageUrl, setLogoImageUrl] = useState('')
+  const [entryFee, setEntryFee] = useState('')
   const [preliminaryRounds, setPreliminaryRounds] = useState<
     number | 'until_one_undefeated' | 'until_two_undefeated'
   >(3)
@@ -18,6 +22,9 @@ export default function CreateTournamentPage() {
   const [registrationTime, setRegistrationTime] = useState('')
   const [registrationEndTime, setRegistrationEndTime] = useState('')
   const [startTime, setStartTime] = useState('')
+  const [venueName, setVenueName] = useState('')
+  const [venueAddress, setVenueAddress] = useState('')
+  const [isPublic, setIsPublic] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,18 +44,20 @@ export default function CreateTournamentPage() {
         eventDateValue = eventDate
       }
       if (eventDate && registrationTime) {
-        registrationTimeValue = `${eventDate}T${registrationTime}:00`
+        registrationTimeValue = combineDateAndTime(eventDate, registrationTime)
       }
       if (eventDate && registrationEndTime) {
-        registrationEndTimeValue = `${eventDate}T${registrationEndTime}:00`
+        registrationEndTimeValue = combineDateAndTime(eventDate, registrationEndTime)
       }
       if (eventDate && startTime) {
-        startTimeValue = `${eventDate}T${startTime}:00`
+        startTimeValue = combineDateAndTime(eventDate, startTime)
       }
 
       const tournament = await createTournament({
         name,
         description,
+        logoImageUrl: logoImageUrl || undefined,
+        entryFee: entryFee ? parseInt(entryFee) : undefined,
         preliminaryRounds,
         tournamentSize,
         entryStartAt: entryStartAt || undefined,
@@ -58,10 +67,17 @@ export default function CreateTournamentPage() {
         registrationTime: registrationTimeValue,
         registrationEndTime: registrationEndTimeValue,
         startTime: startTimeValue,
+        venueName: venueName || undefined,
+        venueAddress: venueAddress || undefined,
+        isPublic,
       })
       navigate(`/tournaments/${tournament.id}/admin`)
     } catch (err: any) {
-      setError(err.response?.data?.message || '大会の作成に失敗しました')
+      const errorMessage = err.response?.data?.message || err.message || '大会の作成に失敗しました'
+      const errorDetail = err.response?.data?.error
+      console.error('Create tournament error:', err)
+      console.error('Error details:', { errorMessage, errorDetail, response: err.response?.data })
+      setError(errorMessage + (errorDetail ? ` (${errorDetail})` : ''))
     } finally {
       setLoading(false)
     }
@@ -92,6 +108,33 @@ export default function CreateTournamentPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               style={{ width: '100%', padding: '8px', marginTop: '5px', minHeight: '100px' }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label>
+            ロゴ画像URL
+            <input
+              type="url"
+              value={logoImageUrl}
+              onChange={(e) => setLogoImageUrl(e.target.value)}
+              placeholder="https://example.com/logo.png"
+              style={{ width: '100%', padding: '8px', marginTop: '5px' }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label>
+            参加費（円）
+            <input
+              type="number"
+              value={entryFee}
+              onChange={(e) => setEntryFee(e.target.value)}
+              min="0"
+              placeholder="例: 1000"
+              style={{ width: '100%', padding: '8px', marginTop: '5px' }}
             />
           </label>
         </div>
@@ -182,7 +225,16 @@ export default function CreateTournamentPage() {
             <input
               type="date"
               value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
+              onChange={(e) => {
+                const newDate = e.target.value
+                setEventDate(newDate)
+                // 開催日を設定したら、時間の日付部分を自動設定
+                if (newDate) {
+                  if (!registrationTime) setRegistrationTime('09:00')
+                  if (!registrationEndTime) setRegistrationEndTime('10:00')
+                  if (!startTime) setStartTime('11:00')
+                }
+              }}
               style={{ width: '100%', padding: '8px', marginTop: '5px' }}
             />
           </label>
@@ -222,6 +274,31 @@ export default function CreateTournamentPage() {
               style={{ width: '100%', padding: '8px', marginTop: '5px' }}
             />
           </label>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <VenueAutocomplete
+            venueName={venueName}
+            venueAddress={venueAddress}
+            onVenueNameChange={setVenueName}
+            onVenueAddressChange={setVenueAddress}
+            apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+            />
+            <span>大会一覧に表示する</span>
+          </label>
+          <p style={{ marginTop: '5px', fontSize: '14px', color: '#666' }}>
+            チェックを外すと、一般ユーザーの大会一覧に表示されません（管理者と主催者は常に見れます）
+          </p>
         </div>
 
         {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}

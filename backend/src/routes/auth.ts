@@ -1,11 +1,10 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { authenticate, AuthRequest } from '../middleware/auth'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 router.post('/register', async (req, res) => {
   try {
@@ -96,7 +95,13 @@ router.post('/login', async (req, res) => {
     })
   } catch (error) {
     console.error('Login error:', error)
-    res.status(500).json({ message: 'ログインに失敗しました' })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Login error details:', { errorMessage, errorStack })
+    res.status(500).json({ 
+      message: 'ログインに失敗しました',
+      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    })
   }
 })
 

@@ -1,0 +1,24 @@
+{
+  "name": "tcg-tournament-system",
+  "version": "1.0.0",
+  "description": "TCG大会用自動対戦マッチングシステム",
+  "private": true,
+  "scripts": {
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "build:parallel": "npm-run-all --parallel build:backend build:frontend",
+    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "echo Please manually delete dist folders",
+    "restart:backend": "cd backend && npm run restart:with-prisma",
+    "migrate": "cd backend && npm run prisma:migrate",
+    "generate:prisma": "cd backend && npm run prisma:generate"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}
+

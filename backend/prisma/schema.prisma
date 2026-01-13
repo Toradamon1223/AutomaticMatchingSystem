@@ -35,6 +35,8 @@ model Tournament {
   id                String   @id @default(uuid())
   name              String
   description       String?
+  logoImageUrl      String?  // ロゴ画像URL
+  entryFee          Int?     // 参加費（円）
   organizerId       String
   organizer         User     @relation("Organizer", fields: [organizerId], references: [id])
   status            TournamentStatus @default(DRAFT)
@@ -53,6 +55,14 @@ model Tournament {
   registrationTime  DateTime? // 受付開始時間
   registrationEndTime DateTime? // 受付終了時間
   startTime         DateTime? // 大会開始時間
+  // 会場情報
+  venueName         String?   // 会場名
+  venueAddress      String?   // 会場住所
+  // アナウンス
+  announcement      String?   // 主催者からのメッセージ
+  // 公開設定
+  isPublic          Boolean   @default(true) // 大会一覧に表示するかどうか
+  matchesVisible    Boolean   @default(false) // 対戦表を参加者に公開するかどうか
   startedAt         DateTime?
   completedAt       DateTime?
   createdAt         DateTime @default(now())
@@ -65,10 +75,11 @@ model Tournament {
 }
 
 enum TournamentStatus {
-  DRAFT
-  REGISTRATION
-  IN_PROGRESS
-  COMPLETED
+  DRAFT              // エントリー開始前
+  REGISTRATION       // エントリー受付中
+  PREPARING          // 大会開催準備中（エントリー締め切り後、マッチング作成可能）
+  IN_PROGRESS        // 大会開催中（スイスドロー＋決勝トーナメント）
+  COMPLETED          // 結果発表
 }
 
 model Participant {
@@ -137,5 +148,6 @@ enum MatchResult {
   PLAYER1
   PLAYER2
   DRAW
+  BOTH_LOSS
 }
 

@@ -185,6 +185,13 @@ export const createNextRound = async (tournamentId: string): Promise<{ round: nu
   return response.data
 }
 
+export const startRound = async (tournamentId: string, round: number): Promise<{ message: string; matchesUpdated: number }> => {
+  const response = await apiClient.post<{ message: string; matchesUpdated: number }>(
+    `/tournaments/${tournamentId}/rounds/${round}/start`
+  )
+  return response.data
+}
+
 export const updateMatchPoints = async (
   tournamentId: string,
   matchId: string,

@@ -994,6 +994,11 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
     const isPlayer1 = match.player1.userId === req.userId!
     const isPlayer2 = match.player2.userId === req.userId!
 
+    // プレビュー用のマッチ（isTournamentMatch: false）には結果を登録できない
+    if (!match.isTournamentMatch && !isAdmin && !isOrganizer) {
+      return res.status(403).json({ message: 'この対戦表はまだ開始されていません' })
+    }
+
     // 管理者/開催者でない場合、対戦者のみ登録可能
     if (!isAdmin && !isOrganizer) {
       if (!isPlayer1 && !isPlayer2) {
@@ -1386,8 +1391,18 @@ router.post('/:id/next-round', authenticate, requireRole('organizer', 'admin'), 
       return res.status(400).json({ message: '現在の回戦の全試合が終了していません' })
     }
 
-    // 次の回戦を作成
+    // 次の回戦を作成（プレビュー用、isTournamentMatch: false）
     const nextRound = currentRound + 1
+    
+    // 既にプレビュー用の対戦表が存在する場合は削除
+    await prisma.match.deleteMany({
+      where: {
+        tournamentId: req.params.id,
+        round: nextRound,
+        isTournamentMatch: false,
+      },
+    })
+    
     const matches = await generatePairings(req.params.id, nextRound)
 
     res.json({
@@ -1413,6 +1428,60 @@ router.post('/:id/rounds/:round/pairings', authenticate, requireRole('organizer'
   } catch (error: any) {
     console.error('Generate pairings error:', error)
     res.status(500).json({ message: error.message || 'マッチングの生成に失敗しました' })
+  }
+})
+
+// 対戦開始（対戦表を参加者に公開・有効化）
+router.post('/:id/rounds/:round/start', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const round = parseInt(req.params.round)
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'in_progress') {
+      return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // プレビュー用の対戦表を有効化（isTournamentMatch: trueに更新）
+    const updatedMatches = await prisma.match.updateMany({
+      where: {
+        tournamentId: req.params.id,
+        round: round,
+        isTournamentMatch: false,
+      },
+      data: {
+        isTournamentMatch: true,
+      },
+    })
+
+    // 現在の回戦数を更新
+    await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: {
+        currentRound: round,
+        maxRounds: Math.max(tournament.maxRounds || 0, round),
+      },
+    })
+
+    res.json({
+      message: `第${round}回戦を開始しました`,
+      matchesUpdated: updatedMatches.count,
+    })
+  } catch (error: any) {
+    console.error('Start round error:', error)
+    res.status(500).json({ 
+      message: error.message || '回戦の開始に失敗しました',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 })
 

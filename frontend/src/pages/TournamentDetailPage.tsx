@@ -21,6 +21,7 @@ import {
   reportMatchResult,
   getStandings,
   createNextRound,
+  startRound,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
 import { format } from 'date-fns'
@@ -1806,8 +1807,12 @@ export default function TournamentDetailPage() {
                     const rounds = Array.from(new Set([...allRounds, ...matchRounds])).sort((a, b) => a - b)
                     
                     const currentRoundMatches = matches.filter(m => m.round === selectedRound)
-                    const completedCount = currentRoundMatches.filter(m => m.result).length
-                    const totalCount = currentRoundMatches.length
+                    // プレビュー用のマッチ（isTournamentMatch: false）も含める
+                    const previewMatches = currentRoundMatches.filter(m => !m.isTournamentMatch)
+                    const activeMatches = currentRoundMatches.filter(m => m.isTournamentMatch)
+                    const hasPreview = previewMatches.length > 0 && activeMatches.length === 0
+                    const completedCount = activeMatches.filter(m => m.result).length
+                    const totalCount = activeMatches.length
 
                     return (
                       <div>
@@ -1916,9 +1921,66 @@ export default function TournamentDetailPage() {
                           })}
                         </div>
 
-                        {/* 全試合終了後の次の対戦表作成ボタン */}
+                        {/* プレビュー用の対戦表がある場合、「開始」ボタンを表示 */}
+                        {canEditTournament && hasPreview && selectedRound === (tournament.currentRound || 0) + 1 && (
+                          <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                            <div style={{ 
+                              marginBottom: '15px',
+                              padding: '15px',
+                              backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5',
+                              borderRadius: '8px',
+                              border: `1px solid ${isDark ? '#444' : '#ddd'}`,
+                            }}>
+                              <p style={{ 
+                                margin: '0 0 10px 0',
+                                color: isDark ? '#fff' : '#333',
+                                fontWeight: 'bold',
+                              }}>
+                                第{selectedRound}回戦の対戦表（プレビュー）
+                              </p>
+                              <p style={{ 
+                                margin: 0,
+                                fontSize: '14px',
+                                color: isDark ? '#aaa' : '#666',
+                              }}>
+                                対戦表を確認し、「開始」ボタンを押すと参加者が結果を登録できるようになります
+                              </p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                if (!id) return
+                                if (!confirm(`第${selectedRound}回戦を開始しますか？\n開始後、参加者が結果を登録できるようになります。`)) return
+                                try {
+                                  await startRound(id, selectedRound)
+                                  alert(`第${selectedRound}回戦を開始しました`)
+                                  await loadTournament()
+                                  await loadMatches(selectedRound)
+                                } catch (error: any) {
+                                  console.error('Start round error:', error)
+                                  const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
+                                  alert(errorMessage)
+                                }
+                              }}
+                              style={{
+                                padding: '12px 24px',
+                                backgroundColor: '#4CAF50',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                fontSize: '16px',
+                                marginRight: '10px',
+                              }}
+                            >
+                              開始
+                            </button>
+                          </div>
+                        )}
+
+                        {/* 全試合終了後の次の対戦表作成ボタン（開始済みの回戦には表示しない） */}
                         {canEditTournament && 
-                         currentRoundMatches.length > 0 && 
+                         activeMatches.length > 0 && 
                          completedCount === totalCount && 
                          completedCount > 0 &&
                          tournament.currentRound && 
@@ -1962,8 +2024,8 @@ export default function TournamentDetailPage() {
                           </div>
                         )}
 
-                        {/* 対戦表表示 */}
-                        {currentRoundMatches.length === 0 ? (
+                        {/* 対戦表表示（プレビュー用も含む） */}
+                        {(currentRoundMatches.length === 0 && !hasPreview) ? (
                           <p style={{ color: isDark ? '#aaa' : '#666' }}>対戦がありません</p>
                         ) : (
                           <div>
@@ -2074,11 +2136,12 @@ export default function TournamentDetailPage() {
                                 padding: isMobile ? '10px 0' : '20px 0',
                               }}
                             >
-                              {currentRoundMatches
+                              {(hasPreview ? previewMatches : activeMatches)
                                 .sort((a, b) => (a.tableNumber || 0) - (b.tableNumber || 0))
                                 .map((match) => {
                                   const isMyMatch = match.player1.user.id === user?.id || match.player2.user.id === user?.id
-                                  const canTap = isMyMatch || canEditTournament
+                                  // プレビュー用のマッチ（isTournamentMatch: false）には結果を登録できない
+                                  const canTap = (isMyMatch || canEditTournament) && match.isTournamentMatch
                                   const player1Win = match.result === 'player1'
                                   const player2Win = match.result === 'player2'
                                   const isDraw = match.result === 'draw'
@@ -2127,6 +2190,8 @@ export default function TournamentDetailPage() {
                                         if (canTap) {
                                           setSelectedMatch(match)
                                           setShowResultDialog(true)
+                                        } else if (!match.isTournamentMatch) {
+                                          alert('この対戦表はまだ開始されていません')
                                         }
                                       }}
                                       onMouseEnter={(e) => {

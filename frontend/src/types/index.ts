@@ -12,9 +12,12 @@ export interface Tournament {
   id: string
   name: string
   description?: string
+  logoImageUrl?: string
+  entryFee?: number
   organizerId: string
+  participantCount?: number
   organizer: User
-  status: 'draft' | 'registration' | 'in_progress' | 'completed'
+  status: 'draft' | 'registration' | 'preparing' | 'in_progress' | 'completed'
   checkInQrCode: string
   preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
   tournamentSize: 4 | 8 | 16 | 32
@@ -27,6 +30,11 @@ export interface Tournament {
   registrationTime?: string
   registrationEndTime?: string
   startTime?: string
+  venueName?: string
+  venueAddress?: string
+  announcement?: string
+  isPublic?: boolean // 大会一覧に表示するかどうか
+  matchesVisible?: boolean // 対戦表を参加者に公開するかどうか
   createdAt: string
   startedAt?: string
   completedAt?: string
@@ -44,6 +52,7 @@ export interface Participant {
   checkedInAt?: string
   dropped: boolean
   droppedAt?: string
+  createdAt?: string // データベースに作成された時刻（同じenteredAtの場合のソート用）
   // 予選成績
   wins: number
   losses: number
@@ -69,7 +78,7 @@ export interface Match {
   player2Id: string
   player2: Participant
   tableNumber?: number
-  result?: 'player1' | 'player2' | 'draw'
+  result?: 'player1' | 'player2' | 'draw' | 'both_loss'
   reportedBy?: string
   reportedAt?: string
   isTournamentMatch: boolean
