@@ -205,6 +205,10 @@ export default function TournamentDetailPage() {
     try {
       const data = await getTournament(id)
       setTournament(data)
+      // 現在のラウンドが存在する場合、selectedRoundを更新
+      if (data.currentRound && data.currentRound > 0) {
+        setSelectedRound(data.currentRound)
+      }
     } catch (error) {
       console.error('大会情報の取得に失敗しました', error)
     } finally {
