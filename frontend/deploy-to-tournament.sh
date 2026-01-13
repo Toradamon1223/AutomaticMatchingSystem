@@ -15,7 +15,13 @@ fi
 
 # Gitから最新のコードを取得
 echo "最新のコードを取得中..."
-git pull || echo "警告: git pullに失敗しました（ローカルの変更がある可能性があります）"
+# ローカルの変更を一時的に退避
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "ローカルの変更を検出しました。一時的に退避します..."
+  git stash push -m "Auto-stash before deploy $(date +%Y%m%d_%H%M%S)"
+fi
+# 最新のコードを取得
+git pull
 
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
