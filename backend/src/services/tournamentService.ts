@@ -24,8 +24,9 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   // 順位を計算（チェックイン済みの参加者のみ）
   await calculateStandings(tournamentId)
 
-  // 第1回戦以降は、前の回戦で対戦した参加者を含める（チェックイン状態に関わらず）
-  // 第1回戦の場合は、チェックイン済みの参加者のみ
+  // 第1回戦はチェックイン済みの参加者のみ
+  // 第2回戦以降は、前の回戦で実際に対戦した参加者を含める
+  // （チェックイン状態は1回戦の時点で設定され、その後は変わらない）
   let participantFilter: any = {
     tournamentId,
     dropped: false,
@@ -36,7 +37,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     // 第1回戦はチェックイン済みの参加者のみ
     participantFilter.checkedIn = true
   } else {
-    // 第2回戦以降は、前の回戦で対戦した参加者を含める
+    // 第2回戦以降は、前の回戦で実際に対戦した参加者を含める
     // 前の回戦のマッチに参加している参加者IDを取得
     const previousMatches = await prisma.match.findMany({
       where: {
@@ -55,6 +56,10 @@ export async function generatePairings(tournamentId: string, round: number): Pro
       previousRoundParticipantIds.add(match.player1Id)
       previousRoundParticipantIds.add(match.player2Id)
     })
+
+    if (previousRoundParticipantIds.size === 0) {
+      throw new Error('前の回戦の対戦データが見つかりません')
+    }
 
     // 前の回戦に参加した参加者のみを含める
     participantFilter.id = {
