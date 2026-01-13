@@ -1674,7 +1674,7 @@ export default function TournamentDetailPage() {
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           {/* 管理画面へのリンク（管理者または主催者のみ） */}
           {canEditTournament && (
-            <div style={{ marginBottom: '20px', textAlign: 'right' }}>
+            <div style={{ marginBottom: '20px', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <Link to={`/tournaments/${id}/admin`}>
                 <button
                   style={{
@@ -1691,6 +1691,38 @@ export default function TournamentDetailPage() {
                   管理画面
                 </button>
               </Link>
+              
+              {/* トーナメントリセットボタン（デバッグ用） */}
+              {tournament.status === 'in_progress' && (
+                <button
+                  onClick={async () => {
+                    if (!id) return
+                    if (!confirm('トーナメントを1回戦開始前にリセットしますか？\nすべてのマッチと成績が削除されます。')) return
+                    try {
+                      await resetTournament(id)
+                      alert('トーナメントをリセットしました')
+                      await loadTournament()
+                      await loadMatches(1)
+                    } catch (error: any) {
+                      console.error('Reset tournament error:', error)
+                      const errorMessage = error.response?.data?.message || error.message || 'トーナメントのリセットに失敗しました'
+                      alert(errorMessage)
+                    }
+                  }}
+                  style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  リセット（1回戦開始前に戻す）
+                </button>
+              )}
             </div>
           )}
           {tournament.status === 'in_progress' ? (
