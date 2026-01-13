@@ -1810,7 +1810,8 @@ export default function TournamentDetailPage() {
                     // プレビュー用のマッチ（isTournamentMatch: false）も含める
                     const previewMatches = currentRoundMatches.filter(m => !m.isTournamentMatch)
                     const activeMatches = currentRoundMatches.filter(m => m.isTournamentMatch)
-                    const hasPreview = previewMatches.length > 0 && activeMatches.length === 0
+                    // プレビュー用のマッチがある場合は、有効化されたマッチがあっても「開始」ボタンを表示
+                    const hasPreview = previewMatches.length > 0
                     const completedCount = activeMatches.filter(m => m.result).length
                     const totalCount = activeMatches.length
 
@@ -1921,8 +1922,8 @@ export default function TournamentDetailPage() {
                           })}
                         </div>
 
-                        {/* プレビュー用の対戦表がある場合、「開始」ボタンを表示 */}
-                        {canEditTournament && hasPreview && selectedRound === (tournament.currentRound || 0) + 1 && (
+                        {/* プレビュー用の対戦表がある場合、「開始」ボタンを表示（既に開催中の回戦でも可） */}
+                        {canEditTournament && hasPreview && (
                           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
                             <div style={{ 
                               marginBottom: '15px',
