@@ -37,13 +37,15 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     // 第1回戦はチェックイン済みの参加者のみ
     participantFilter.checkedIn = true
   } else {
-    // 第2回戦以降は、前の回戦で実際に対戦した参加者を含める
+    // 第2回戦以降は、前の回戦で対戦した参加者を含める
     // 前の回戦のマッチに参加している参加者IDを取得
+    // プレビューマッチ（isTournamentMatch: false）も含める
+    // なぜなら、1回戦がまだ「開始」されていない場合でも、対戦表は作成されているから
     const previousMatches = await prisma.match.findMany({
       where: {
         tournamentId,
         round: round - 1,
-        isTournamentMatch: true, // 実際に対戦したマッチのみ
+        // isTournamentMatchの条件を削除：プレビューマッチも含める
       },
       select: {
         player1Id: true,
@@ -53,8 +55,11 @@ export async function generatePairings(tournamentId: string, round: number): Pro
 
     const previousRoundParticipantIds = new Set<string>()
     previousMatches.forEach(match => {
+      // BYEマッチ（player1Id === player2Id）も含める
       previousRoundParticipantIds.add(match.player1Id)
-      previousRoundParticipantIds.add(match.player2Id)
+      if (match.player1Id !== match.player2Id) {
+        previousRoundParticipantIds.add(match.player2Id)
+      }
     })
 
     if (previousRoundParticipantIds.size === 0) {
@@ -87,11 +92,13 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   }
 
   // 既に対戦した相手を記録
+  // プレビューマッチも含める（再マッチ防止のため）
   const previousOpponents = new Map<string, Set<string>>()
   const previousMatches = await prisma.match.findMany({
     where: {
       tournamentId,
       round: { lt: round },
+      // isTournamentMatchの条件を削除：プレビューマッチも含める
     },
   })
 
@@ -351,13 +358,57 @@ export async function generatePairings(tournamentId: string, round: number): Pro
 
 // オポネント方式による順位計算
 export async function calculateStandings(tournamentId: string): Promise<void> {
+  // 第1回戦以降は、前の回戦に参加した参加者の順位を計算する
+  // チェックイン状態に関わらず、実際に対戦した参加者の順位を計算
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+  })
+
+  if (!tournament) {
+    throw new Error('大会が見つかりません')
+  }
+
+  // 第1回戦以降の場合、前の回戦に参加した参加者のみを対象にする
+  let participantFilter: any = {
+    tournamentId,
+    dropped: false,
+    cancelledAt: null,
+  }
+
+  if (tournament.currentRound && tournament.currentRound > 0) {
+    // 前の回戦に参加した参加者IDを取得
+    const previousMatches = await prisma.match.findMany({
+      where: {
+        tournamentId,
+        round: tournament.currentRound,
+        // プレビューマッチも含める（結果が登録されていれば順位計算に含める）
+      },
+      select: {
+        player1Id: true,
+        player2Id: true,
+      },
+    })
+
+    const previousRoundParticipantIds = new Set<string>()
+    previousMatches.forEach(match => {
+      previousRoundParticipantIds.add(match.player1Id)
+      if (match.player1Id !== match.player2Id) {
+        previousRoundParticipantIds.add(match.player2Id)
+      }
+    })
+
+    if (previousRoundParticipantIds.size > 0) {
+      participantFilter.id = {
+        in: Array.from(previousRoundParticipantIds),
+      }
+    }
+  } else {
+    // 第1回戦前は、チェックイン済みの参加者のみ
+    participantFilter.checkedIn = true
+  }
+
   const participants = await prisma.participant.findMany({
-    where: {
-      tournamentId,
-      checkedIn: true,
-      dropped: false,
-      cancelledAt: null, // キャンセルされていない参加者のみ
-    },
+    where: participantFilter,
     include: {
       matchesAsPlayer1: {
         where: {
