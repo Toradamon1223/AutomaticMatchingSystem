@@ -392,17 +392,22 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
     }
 
     // 定員内の参加者数を正確に計算（enteredAt順でソートしてから判定）
-    const sortedParticipants = [...tournament.participants].sort((a, b) => {
-      const dateA = a.enteredAt.getTime()
-      const dateB = b.enteredAt.getTime()
-      if (dateA !== dateB) {
-        return dateA - dateB
-      }
-      // 同じenteredAtの場合はcreatedAtでソート（より早く作成された方が先）
-      return a.createdAt.getTime() - b.createdAt.getTime()
-    })
+    // 現在エントリーしようとしている参加者を除いた、既存の参加者で計算
+    const sortedParticipants = [...tournament.participants]
+      .filter(p => p.id !== existingEntry?.id) // 再エントリーの場合は既存の参加者を除外
+      .sort((a, b) => {
+        const dateA = a.enteredAt.getTime()
+        const dateB = b.enteredAt.getTime()
+        if (dateA !== dateB) {
+          return dateA - dateB
+        }
+        // 同じenteredAtの場合はcreatedAtでソート（より早く作成された方が先）
+        return a.createdAt.getTime() - b.createdAt.getTime()
+      })
 
+    // 既存の参加者で定員内の人数を計算（isWaitlist: falseの人数）
     const confirmedCount = sortedParticipants.filter(p => !p.isWaitlist).length
+    // 現在エントリーしようとしている参加者を含めて判定
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
     // エントリー作成または再エントリー
@@ -569,30 +574,49 @@ router.post('/:id/participants/:participantId/cancel', authenticate, async (req:
       },
     })
 
-    // キャンセル待ちの最初の人を定員内に移動
+    // キャンセル待ちの人を定員内に移動（定員に空きがある限り繰り上げる）
     const tournamentWithParticipants = await prisma.tournament.findUnique({
       where: { id: req.params.id },
       include: {
         participants: {
           where: {
             cancelledAt: null,
-            isWaitlist: true,
           },
-          orderBy: {
-            enteredAt: 'asc',
-          },
-          take: 1,
         },
       },
     })
 
-    if (tournamentWithParticipants && tournamentWithParticipants.participants.length > 0) {
-      await prisma.participant.update({
-        where: { id: tournamentWithParticipants.participants[0].id },
-        data: {
-          isWaitlist: false,
-        },
-      })
+    if (tournamentWithParticipants) {
+      // 定員内の参加者数（isWaitlist: falseの人数）
+      const confirmedCount = tournamentWithParticipants.participants.filter((p: any) => !p.isWaitlist).length
+      const capacity = tournamentWithParticipants.capacity
+      
+      // 定員に空きがある場合、キャンセル待ちの最初の人を定員内に移動
+      if (capacity === null || confirmedCount < capacity) {
+        const waitlistParticipants = tournamentWithParticipants.participants
+          .filter((p: any) => p.isWaitlist)
+          .sort((a: any, b: any) => {
+            const dateA = a.enteredAt.getTime()
+            const dateB = b.enteredAt.getTime()
+            if (dateA !== dateB) {
+              return dateA - dateB
+            }
+            return a.createdAt.getTime() - b.createdAt.getTime()
+          })
+        
+        // 定員に空きがある限り繰り上げる
+        const slotsAvailable = capacity === null ? waitlistParticipants.length : capacity - confirmedCount
+        const participantsToPromote = waitlistParticipants.slice(0, slotsAvailable)
+        
+        for (const participant of participantsToPromote) {
+          await prisma.participant.update({
+            where: { id: participant.id },
+            data: {
+              isWaitlist: false,
+            },
+          })
+        }
+      }
     }
 
     res.json({ message: '参加者をキャンセルしました' })
