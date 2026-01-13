@@ -15,13 +15,16 @@ fi
 
 # Gitから最新のコードを取得
 echo "最新のコードを取得中..."
-# ローカルの変更を一時的に退避
+# ローカルの変更を強制的にリセット（サーバー上の変更は破棄）
+# 注意: サーバー上で手動で変更したファイルは失われます
 if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo "ローカルの変更を検出しました。一時的に退避します..."
-  git stash push -m "Auto-stash before deploy $(date +%Y%m%d_%H%M%S)"
+  echo "ローカルの変更を検出しました。リモートの状態にリセットします..."
+  git reset --hard HEAD
+  git clean -fd
 fi
 # 最新のコードを取得
-git pull
+git fetch origin
+git reset --hard origin/main
 
 # デプロイスクリプト自体に実行権限を付与（git pullで権限がリセットされる可能性があるため）
 chmod +x frontend/deploy-to-tournament.sh
