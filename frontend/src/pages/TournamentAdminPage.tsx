@@ -44,10 +44,10 @@ export default function TournamentAdminPage() {
   }
 
   const handleStartTournament = async () => {
-    if (!id) return
+    if (!id || !tournament) return
     if (!confirm('大会を開始しますか？')) return
     try {
-      await startTournament(id)
+      await startTournament(id, tournament.preliminaryRounds)
       alert('大会を開始しました')
       loadData()
     } catch (error: any) {
@@ -128,7 +128,10 @@ export default function TournamentAdminPage() {
               <th style={{ border: '1px solid #ccc', padding: '8px' }}>チェックイン</th>
               <th style={{ border: '1px solid #ccc', padding: '8px' }}>勝敗</th>
               <th style={{ border: '1px solid #ccc', padding: '8px' }}>得点</th>
-              <th style={{ border: '1px solid #ccc', padding: '8px' }}>操作</th>
+              {/* トーナメントが開催中の場合のみ操作列を表示 */}
+              {tournament.status === 'in_progress' && (
+                <th style={{ border: '1px solid #ccc', padding: '8px' }}>操作</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -144,11 +147,14 @@ export default function TournamentAdminPage() {
                   {participant.wins}-{participant.losses}-{participant.draws}
                 </td>
                 <td style={{ border: '1px solid #ccc', padding: '8px' }}>{participant.points}</td>
-                <td style={{ border: '1px solid #ccc', padding: '8px' }}>
-                  {!participant.dropped && (
-                    <button onClick={() => handleDropParticipant(participant.id)}>棄権</button>
-                  )}
-                </td>
+                {/* 棄権は大会開催中のみ可能 */}
+                {tournament.status === 'in_progress' && (
+                  <td style={{ border: '1px solid #ccc', padding: '8px' }}>
+                    {!participant.dropped && (
+                      <button onClick={() => handleDropParticipant(participant.id)}>棄権</button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

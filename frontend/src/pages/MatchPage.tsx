@@ -199,7 +199,7 @@ export default function MatchPage() {
                   {myMatch.result === 'player1' && myMatch.player1.userId === user?.id && '勝利'}
                   {myMatch.result === 'player2' && myMatch.player2.userId === user?.id && '勝利'}
                   {myMatch.result === 'draw' && '引き分け'}
-                  {myMatch.result === 'both_loss' && '両者敗北'}
+                  {(myMatch.result as string) === 'both_loss' && '両者敗北'}
                   {(myMatch.result === 'player1' && myMatch.player1.userId !== user?.id) ||
                   (myMatch.result === 'player2' && myMatch.player2.userId !== user?.id)
                     ? '敗北'
@@ -456,7 +456,6 @@ export default function MatchPage() {
             <div style={{ marginBottom: '20px' }}>
               {(() => {
                 const isMyMatch = selectedMatch.player1.userId === user?.id || selectedMatch.player2.userId === user?.id
-                const isPlayer1 = selectedMatch.player1.userId === user?.id
                 const hasResult = !!selectedMatch.result
                 
                 // 参加者の場合、結果が登録されている場合は結果を表示（管理者/主催者は変更可能）
