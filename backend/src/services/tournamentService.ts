@@ -349,6 +349,60 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         }
       }
     }
+
+    // グループが奇数人数で残った場合、最後の1人をBYEとして処理
+    if (group.length === 1) {
+      const remainingPlayer = group[0]
+      if (!used.has(remainingPlayer.id)) {
+        const byeMatch = await prisma.match.create({
+          data: {
+            tournamentId,
+            round,
+            matchNumber: matchNumber++,
+            player1Id: remainingPlayer.id,
+            player2Id: remainingPlayer.id,
+            tableNumber: tableNumber++,
+            isTournamentMatch: false,
+            result: 'PLAYER1',
+            reportedBy: null,
+            reportedAt: new Date(),
+          },
+          include: {
+            player1: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+            player2: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+        
+        matches.push(byeMatch)
+        
+        await prisma.participant.update({
+          where: { id: remainingPlayer.id },
+          data: {
+            wins: { increment: 1 },
+            points: { increment: 3 },
+          },
+        })
+        used.add(remainingPlayer.id)
+      }
+    }
   }
 
   // 現在の回戦数を更新
