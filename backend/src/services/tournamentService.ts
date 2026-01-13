@@ -143,6 +143,15 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   console.log(`[generatePairings] Round ${round}: Record groups:`)
   for (const [record, group] of recordGroups.entries()) {
     console.log(`  ${record}: ${group.length} participants`)
+    // 各グループの最初の数人の参加者IDとポイントをログ出力
+    const sampleParticipants = group.slice(0, 3).map(p => ({
+      id: p.id.substring(0, 8),
+      name: p.user.name,
+      wins: p.wins,
+      losses: p.losses,
+      points: p.points
+    }))
+    console.log(`    Sample:`, sampleParticipants)
   }
 
   // 勝敗数の降順でソート（2-0 > 1-1 > 0-2 など）
