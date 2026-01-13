@@ -2316,6 +2316,7 @@ export default function TournamentDetailPage() {
                         </thead>
                         <tbody>
                           {standings
+                            .filter((standing) => standing.participant.checkedIn) // チェックイン済みの参加者のみ表示
                             .sort((a, b) => {
                               // 1. 累計得点
                               if (a.points !== b.points) {

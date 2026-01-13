@@ -1,23 +1,42 @@
 import express from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../lib/prisma'
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth'
 import { generatePairings, calculateStandings } from '../services/tournamentService'
 import { transformTournament, transformMatch } from '../utils/tournamentTransform'
+import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 import QRCode from 'qrcode'
+import bcrypt from 'bcryptjs'
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // 大会一覧取得
 router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
+    // 一般ユーザーはisPublic=trueのみ、管理者と開催者は全て表示
+    const isAdmin = req.user?.role === 'admin'
+    const whereClause: any = {}
+    
+    if (!isAdmin) {
+      // 一般ユーザーまたは主催者の場合
+      whereClause.OR = [
+        { isPublic: true }, // 公開されている大会
+        { organizerId: req.userId! }, // または自分が主催している大会
+      ]
+    }
+
     const tournaments = await prisma.tournament.findMany({
+      where: whereClause,
       include: {
         organizer: {
           select: {
             id: true,
             name: true,
             email: true,
+          },
+        },
+        participants: {
+          where: {
+            cancelledAt: null,
           },
         },
       },
@@ -27,7 +46,14 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(tournaments.map(transformTournament))
+    res.json(tournaments.map((tournament) => {
+      const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
+      const transformed = transformTournament(tournament)
+      return {
+        ...transformed,
+        participantCount: confirmedCount,
+      }
+    }))
   } catch (error) {
     console.error('Get tournaments error:', error)
     res.status(500).json({ message: '大会一覧の取得に失敗しました' })
@@ -104,10 +130,80 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
+// 大会情報更新（管理者または主催者のみ）
+router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 権限チェック: 管理者または主催者（自分の主催する大会のみ）
+    if (req.user?.role !== 'admin' && tournament.organizerId !== req.userId) {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    const {
+      name,
+      description,
+      logoImageUrl,
+      entryFee,
+      venueName,
+      venueAddress,
+      eventDate,
+      registrationTime,
+      registrationEndTime,
+      startTime,
+      capacity,
+      entryStartAt,
+      entryEndAt,
+      isPublic,
+    } = req.body
+
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (description !== undefined) updateData.description = description
+    if (logoImageUrl !== undefined) updateData.logoImageUrl = logoImageUrl
+    if (entryFee !== undefined) updateData.entryFee = entryFee
+    if (venueName !== undefined) updateData.venueName = venueName
+    if (venueAddress !== undefined) updateData.venueAddress = venueAddress
+    if (eventDate !== undefined) updateData.eventDate = eventDate ? parseJSTISOString(eventDate) : null
+    if (registrationTime !== undefined) updateData.registrationTime = registrationTime ? parseJSTISOString(registrationTime) : null
+    if (registrationEndTime !== undefined) updateData.registrationEndTime = registrationEndTime ? parseJSTISOString(registrationEndTime) : null
+    if (startTime !== undefined) updateData.startTime = startTime ? parseJSTISOString(startTime) : null
+    if (capacity !== undefined) updateData.capacity = capacity
+    if (entryStartAt !== undefined) updateData.entryStartAt = entryStartAt ? parseJSTISOString(entryStartAt) : null
+    if (entryEndAt !== undefined) updateData.entryEndAt = entryEndAt ? parseJSTISOString(entryEndAt) : null
+    if (isPublic !== undefined) updateData.isPublic = isPublic
+
+    const updatedTournament = await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: updateData,
+      include: {
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    res.json(transformTournament(updatedTournament))
+  } catch (error) {
+    console.error('Update tournament error:', error)
+    res.status(500).json({ message: '大会情報の更新に失敗しました' })
+  }
+})
+
 // 大会作成
 router.post('/', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {
-    const { name, description, preliminaryRounds, tournamentSize, entryStartAt, entryEndAt, capacity, eventDate, registrationTime, registrationEndTime, startTime } = req.body
+    const { name, description, logoImageUrl, entryFee, preliminaryRounds, tournamentSize, entryStartAt, entryEndAt, capacity, eventDate, registrationTime, registrationEndTime, startTime, venueName, venueAddress, isPublic } = req.body
 
     if (!name || !preliminaryRounds || !tournamentSize) {
       return res.status(400).json({ message: '必須項目が不足しています' })
@@ -124,17 +220,22 @@ router.post('/', authenticate, requireRole('organizer', 'admin'), async (req: Au
       data: {
         name,
         description,
+        logoImageUrl: logoImageUrl || null,
+        entryFee: entryFee ? parseInt(entryFee) : null,
         organizerId: req.userId!,
         checkInQrCode: qrCodeData,
         preliminaryRounds: JSON.stringify(preliminaryRounds),
         tournamentSize,
-        entryStartAt: entryStartAt ? new Date(entryStartAt) : null,
-        entryEndAt: entryEndAt ? new Date(entryEndAt) : null,
+        entryStartAt: entryStartAt ? parseJSTISOString(entryStartAt) : null,
+        entryEndAt: entryEndAt ? parseJSTISOString(entryEndAt) : null,
         capacity: capacity ? parseInt(capacity) : null,
-        eventDate: eventDate ? new Date(eventDate) : null,
-        registrationTime: registrationTime ? new Date(registrationTime) : null,
-        registrationEndTime: registrationEndTime ? new Date(registrationEndTime) : null,
-        startTime: startTime ? new Date(startTime) : null,
+        eventDate: eventDate ? parseJSTISOString(eventDate) : null,
+        registrationTime: registrationTime ? parseJSTISOString(registrationTime) : null,
+        registrationEndTime: registrationEndTime ? parseJSTISOString(registrationEndTime) : null,
+        startTime: startTime ? parseJSTISOString(startTime) : null,
+        venueName: venueName || null,
+        venueAddress: venueAddress || null,
+        isPublic: isPublic !== undefined ? isPublic : true, // デフォルトはtrue
         status: 'DRAFT',
       },
       include: {
@@ -151,7 +252,13 @@ router.post('/', authenticate, requireRole('organizer', 'admin'), async (req: Au
     res.json(transformTournament(tournament))
   } catch (error) {
     console.error('Create tournament error:', error)
-    res.status(500).json({ message: '大会の作成に失敗しました' })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Create tournament error details:', { errorMessage, errorStack })
+    res.status(500).json({ 
+      message: '大会の作成に失敗しました',
+      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    })
   }
 })
 
@@ -185,7 +292,7 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ message: '大会が見つかりません' })
     }
 
-    const now = new Date()
+    const now = getJSTNow()
     const isEntryPeriod = tournament.entryStartAt && tournament.entryEndAt
       ? now >= tournament.entryStartAt && now <= tournament.entryEndAt
       : false
@@ -193,6 +300,21 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
     // 定員内の参加者数
     const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
     const waitlistCount = tournament.participants.filter(p => p.isWaitlist).length
+    
+    // デバッグ用（本番では削除可能）
+    console.log('Entry status calculation:', {
+      tournamentId: req.params.id,
+      totalParticipants: tournament.participants.length,
+      confirmedCount,
+      waitlistCount,
+      capacity: tournament.capacity,
+      participants: tournament.participants.map(p => ({
+        id: p.id,
+        userId: p.userId,
+        isWaitlist: p.isWaitlist,
+        cancelledAt: p.cancelledAt,
+      })),
+    })
 
     // 現在のユーザーのエントリー状況
     const myEntry = tournament.participants.find(p => p.userId === req.userId!)
@@ -212,7 +334,13 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
     })
   } catch (error) {
     console.error('Get entry status error:', error)
-    res.status(500).json({ message: 'エントリー状況の取得に失敗しました' })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Get entry status error details:', { errorMessage, errorStack })
+    res.status(500).json({ 
+      message: 'エントリー状況の取得に失敗しました',
+      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    })
   }
 })
 
@@ -237,7 +365,7 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ message: '大会が見つかりません' })
     }
 
-    const now = new Date()
+    const now = getJSTNow()
     // エントリー期間のチェック
     if (tournament.entryStartAt && tournament.entryEndAt) {
       if (now < tournament.entryStartAt) {
@@ -263,8 +391,18 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ message: '既にエントリー済みです' })
     }
 
-    // 定員内の参加者数
-    const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
+    // 定員内の参加者数を正確に計算（enteredAt順でソートしてから判定）
+    const sortedParticipants = [...tournament.participants].sort((a, b) => {
+      const dateA = a.enteredAt.getTime()
+      const dateB = b.enteredAt.getTime()
+      if (dateA !== dateB) {
+        return dateA - dateB
+      }
+      // 同じenteredAtの場合はcreatedAtでソート（より早く作成された方が先）
+      return a.createdAt.getTime() - b.createdAt.getTime()
+    })
+
+    const confirmedCount = sortedParticipants.filter(p => !p.isWaitlist).length
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
     // エントリー作成または再エントリー
@@ -274,7 +412,7 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
       const participant = await prisma.participant.update({
         where: { id: existingEntry.id },
         data: {
-          enteredAt: new Date(), // 再エントリー時は現在時刻に更新（エントリーNo.が最後になる）
+          enteredAt: getJSTNow(), // 再エントリー時は現在時刻に更新（エントリーNo.が最後になる）
           isWaitlist,
           cancelledAt: null,
           dropped: false, // 棄権フラグをリセット
@@ -298,11 +436,12 @@ router.post('/:id/entry', authenticate, async (req: AuthRequest, res) => {
       })
     } else {
       // 新規エントリー
+      // 同じ時刻でエントリーされた場合でも、createdAtで順序が決まるようにする
       const participant = await prisma.participant.create({
         data: {
           tournamentId: req.params.id,
           userId: req.userId!,
-          enteredAt: new Date(),
+          enteredAt: getJSTNow(),
           isWaitlist,
         },
         include: {
@@ -385,6 +524,81 @@ router.post('/:id/entry/cancel', authenticate, async (req: AuthRequest, res) => 
   } catch (error) {
     console.error('Cancel entry error:', error)
     res.status(500).json({ message: 'エントリーのキャンセルに失敗しました' })
+  }
+})
+
+// 参加者を強制キャンセル（管理者または主催者のみ）
+router.post('/:id/participants/:participantId/cancel', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 権限チェック: 管理者または主催者（自分の主催する大会のみ）
+    if (req.user?.role !== 'admin' && tournament.organizerId !== req.userId) {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    const participant = await prisma.participant.findUnique({
+      where: { id: req.params.participantId },
+    })
+
+    if (!participant) {
+      return res.status(404).json({ message: '参加者が見つかりません' })
+    }
+
+    if (participant.tournamentId !== req.params.id) {
+      return res.status(400).json({ message: 'この参加者はこの大会の参加者ではありません' })
+    }
+
+    if (participant.cancelledAt) {
+      return res.status(400).json({ message: '既にキャンセル済みです' })
+    }
+
+    await prisma.participant.update({
+      where: { id: participant.id },
+      data: {
+        cancelledAt: new Date(),
+        // チェックイン済みユーザーをキャンセルする場合、チェックイン状態もリセット
+        checkedIn: false,
+        checkedInAt: null,
+      },
+    })
+
+    // キャンセル待ちの最初の人を定員内に移動
+    const tournamentWithParticipants = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      include: {
+        participants: {
+          where: {
+            cancelledAt: null,
+            isWaitlist: true,
+          },
+          orderBy: {
+            enteredAt: 'asc',
+          },
+          take: 1,
+        },
+      },
+    })
+
+    if (tournamentWithParticipants && tournamentWithParticipants.participants.length > 0) {
+      await prisma.participant.update({
+        where: { id: tournamentWithParticipants.participants[0].id },
+        data: {
+          isWaitlist: false,
+        },
+      })
+    }
+
+    res.json({ message: '参加者をキャンセルしました' })
+  } catch (error) {
+    console.error('Force cancel participant error:', error)
+    res.status(500).json({ message: '参加者のキャンセルに失敗しました' })
   }
 })
 
@@ -473,15 +687,170 @@ router.get('/:id/participants', authenticate, async (req: AuthRequest, res) => {
           },
         },
       },
-      orderBy: {
-        rank: 'asc',
-      },
+      orderBy: [
+        { enteredAt: 'asc' }, // エントリー順でソート
+        { createdAt: 'asc' }, // 同じenteredAtの場合は作成順でソート
+      ],
     })
 
     res.json(participants)
   } catch (error) {
     console.error('Get participants error:', error)
-    res.status(500).json({ message: '参加者一覧の取得に失敗しました' })
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('Get participants error details:', { errorMessage, errorStack })
+    res.status(500).json({ 
+      message: '参加者一覧の取得に失敗しました',
+      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    })
+  }
+})
+
+// 参加者のチェックイン/チェックアウト（管理者または主催者のみ）
+router.post('/:id/participants/:participantId/checkin', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 権限チェック: 管理者または主催者（自分の主催する大会のみ）
+    if (req.user?.role !== 'admin' && tournament.organizerId !== req.userId) {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    // 受付時間中かチェック
+    const now = getJSTNow()
+    const isRegistrationPeriod = tournament.registrationTime && tournament.registrationEndTime
+      ? now >= tournament.registrationTime && now <= tournament.registrationEndTime
+      : false
+
+    if (!isRegistrationPeriod) {
+      return res.status(400).json({ message: '受付時間中のみチェックイン可能です' })
+    }
+
+    const participant = await prisma.participant.findUnique({
+      where: { id: req.params.participantId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    if (!participant) {
+      return res.status(404).json({ message: '参加者が見つかりません' })
+    }
+
+    if (participant.tournamentId !== req.params.id) {
+      return res.status(400).json({ message: '無効なリクエストです' })
+    }
+
+    // チェックイン/チェックアウトをトグル
+    const updatedParticipant = await prisma.participant.update({
+      where: { id: req.params.participantId },
+      data: {
+        checkedIn: !participant.checkedIn,
+        checkedInAt: !participant.checkedIn ? new Date() : null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    res.json(updatedParticipant)
+  } catch (error) {
+    console.error('Check-in toggle error:', error)
+    res.status(500).json({ message: 'チェックイン処理に失敗しました' })
+  }
+})
+
+// ゲストユーザーを追加（管理者または主催者のみ）
+router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { playerName } = req.body
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      include: {
+        participants: {
+          where: {
+            cancelledAt: null,
+          },
+        },
+      },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 権限チェック: 管理者または主催者（自分の主催する大会のみ）
+    if (req.user?.role !== 'admin' && tournament.organizerId !== req.userId) {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    // ゲスト追加は受付時間外でも可能（管理者/主催者のみ）
+
+    if (!playerName || playerName.trim() === '') {
+      return res.status(400).json({ message: 'プレイヤー名を入力してください' })
+    }
+
+    // ゲストユーザー用の一時的なemailを生成
+    const guestEmail = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}@guest.local`
+    const hashedPassword = await bcrypt.hash('guest', 10)
+
+    // ゲストユーザーを作成
+    const guestUser = await prisma.user.create({
+      data: {
+        email: guestEmail,
+        name: playerName.trim(),
+        password: hashedPassword,
+        role: 'USER',
+      },
+    })
+
+    // 定員内の参加者数を計算
+    const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
+    const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
+
+    // 参加者として追加（エントリー済みだが、チェックインは未チェック）
+    const participant = await prisma.participant.create({
+      data: {
+        tournamentId: req.params.id,
+        userId: guestUser.id,
+        enteredAt: getJSTNow(),
+        isWaitlist,
+        checkedIn: false, // ゲストユーザーも他のユーザーと同じく手動でチェックイン
+        checkedInAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    res.json(participant)
+  } catch (error) {
+    console.error('Add guest user error:', error)
+    res.status(500).json({ message: 'ゲストユーザーの追加に失敗しました' })
   }
 })
 
@@ -489,6 +858,21 @@ router.get('/:id/participants', authenticate, async (req: AuthRequest, res) => {
 router.get('/:id/matches', authenticate, async (req: AuthRequest, res) => {
   try {
     const { round } = req.query
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 対戦表が公開されていない場合、管理者/開催者のみアクセス可能
+    const isAdmin = req.user?.role === 'admin'
+    const isOrganizer = tournament.organizerId === req.userId
+    if (!tournament.matchesVisible && !isAdmin && !isOrganizer) {
+      return res.status(403).json({ message: '対戦表はまだ公開されていません' })
+    }
+
     const where: any = { tournamentId: req.params.id }
     if (round) {
       where.round = parseInt(round as string)
@@ -520,6 +904,7 @@ router.get('/:id/matches', authenticate, async (req: AuthRequest, res) => {
       },
       orderBy: [
         { round: 'asc' },
+        { tableNumber: 'asc' },
         { matchNumber: 'asc' },
       ],
     })
@@ -595,27 +980,79 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
       return res.status(400).json({ message: '無効なリクエストです' })
     }
 
-    // 勝った方が登録することを確認
+    // 管理者/開催者の権限チェック
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    const isAdmin = req.user?.role === 'admin'
+    const isOrganizer = tournament.organizerId === req.userId
     const isPlayer1 = match.player1.userId === req.userId!
     const isPlayer2 = match.player2.userId === req.userId!
 
-    if (!isPlayer1 && !isPlayer2) {
-      return res.status(403).json({ message: 'この対戦の結果を登録する権限がありません' })
-    }
+    // 管理者/開催者でない場合、対戦者のみ登録可能
+    if (!isAdmin && !isOrganizer) {
+      if (!isPlayer1 && !isPlayer2) {
+        return res.status(403).json({ message: 'この対戦の結果を登録する権限がありません' })
+      }
 
-    if (match.result) {
-      return res.status(400).json({ message: '既に結果が登録されています' })
-    }
+      if (match.result) {
+        return res.status(400).json({ message: '既に結果が登録されています' })
+      }
 
-    // 勝者が登録しているか確認
-    if (result === 'player1' && !isPlayer1) {
-      return res.status(400).json({ message: '勝者が結果を登録してください' })
+      // 勝者が登録しているか確認（管理者/開催者以外の場合のみ）
+      if (result === 'player1' && !isPlayer1) {
+        return res.status(400).json({ message: '勝者が結果を登録してください' })
+      }
+      if (result === 'player2' && !isPlayer2) {
+        return res.status(400).json({ message: '勝者が結果を登録してください' })
+      }
+      if (result === 'draw' && !isPlayer1 && !isPlayer2) {
+        return res.status(400).json({ message: '対戦者のみ結果を登録できます' })
+      }
+      // 両者敗北は管理者/開催者のみ登録可能
+      if (result === 'both_loss' && !isAdmin && !isOrganizer) {
+        return res.status(403).json({ message: '両者敗北は管理者/開催者のみ登録できます' })
+      }
     }
-    if (result === 'player2' && !isPlayer2) {
-      return res.status(400).json({ message: '勝者が結果を登録してください' })
-    }
-    if (result === 'draw' && !isPlayer1 && !isPlayer2) {
-      return res.status(400).json({ message: '対戦者のみ結果を登録できます' })
+    // 管理者/開催者の場合、既に結果が登録されている場合でも更新可能（結果登録のやり直し）
+
+    // 既存の結果がある場合、成績を元に戻す（管理者/開催者の結果変更時）
+    if (match.result && (isAdmin || isOrganizer)) {
+      const oldResult = typeof match.result === 'string' ? match.result.toUpperCase() : match.result
+      const oldPlayer1Wins = oldResult === 'PLAYER1' ? 1 : 0
+      const oldPlayer1Losses = oldResult === 'PLAYER2' || oldResult === 'BOTH_LOSS' ? 1 : 0
+      const oldPlayer1Draws = oldResult === 'DRAW' ? 1 : 0
+      const oldPlayer1Points = oldResult === 'PLAYER1' ? 3 : oldResult === 'DRAW' ? 1 : 0
+
+      const oldPlayer2Wins = oldResult === 'PLAYER2' ? 1 : 0
+      const oldPlayer2Losses = oldResult === 'PLAYER1' || oldResult === 'BOTH_LOSS' ? 1 : 0
+      const oldPlayer2Draws = oldResult === 'DRAW' ? 1 : 0
+      const oldPlayer2Points = oldResult === 'PLAYER2' ? 3 : oldResult === 'DRAW' ? 1 : 0
+
+      await prisma.participant.update({
+        where: { id: match.player1Id },
+        data: {
+          wins: { decrement: oldPlayer1Wins },
+          losses: { decrement: oldPlayer1Losses },
+          draws: { decrement: oldPlayer1Draws },
+          points: { decrement: oldPlayer1Points },
+        },
+      })
+
+      await prisma.participant.update({
+        where: { id: match.player2Id },
+        data: {
+          wins: { decrement: oldPlayer2Wins },
+          losses: { decrement: oldPlayer2Losses },
+          draws: { decrement: oldPlayer2Draws },
+          points: { decrement: oldPlayer2Points },
+        },
+      })
     }
 
     // 結果を登録
@@ -654,12 +1091,12 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
 
     // 参加者の成績を更新
     const player1Wins = result === 'player1' ? 1 : 0
-    const player1Losses = result === 'player2' ? 1 : 0
+    const player1Losses = result === 'player2' || result === 'both_loss' ? 1 : 0
     const player1Draws = result === 'draw' ? 1 : 0
     const player1Points = result === 'player1' ? 3 : result === 'draw' ? 1 : 0
 
     const player2Wins = result === 'player2' ? 1 : 0
-    const player2Losses = result === 'player1' ? 1 : 0
+    const player2Losses = result === 'player1' || result === 'both_loss' ? 1 : 0
     const player2Draws = result === 'draw' ? 1 : 0
     const player2Points = result === 'player2' ? 3 : result === 'draw' ? 1 : 0
 
@@ -683,10 +1120,35 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
       },
     })
 
-    // 順位を再計算
-    await calculateStandings(req.params.id)
-
+    // レスポンスを先に返す
     res.json(transformedMatch)
+
+    // そのラウンドの全対戦が完了した場合、または管理者/開催者が結果を修正した場合は順位計算を実行（非同期で実行）
+    const round = updatedMatch.round
+    ;(async () => {
+      try {
+        const totalMatchesInRound = await prisma.match.count({
+          where: {
+            tournamentId: req.params.id,
+            round,
+          },
+        })
+        const completedMatchesInRound = await prisma.match.count({
+          where: {
+            tournamentId: req.params.id,
+            round,
+            result: { not: null },
+          },
+        })
+
+        // 全対戦が完了した場合、または管理者/開催者が結果を修正した場合は順位計算を実行
+        if (totalMatchesInRound === completedMatchesInRound || (isAdmin || isOrganizer)) {
+          await calculateStandings(req.params.id)
+        }
+      } catch (error) {
+        console.error('Background standings calculation error:', error)
+      }
+    })()
   } catch (error) {
     console.error('Report result error:', error)
     res.status(500).json({ message: '結果の登録に失敗しました' })
@@ -699,6 +1161,7 @@ router.get('/:id/standings', authenticate, async (req: AuthRequest, res) => {
     const participants = await prisma.participant.findMany({
       where: {
         tournamentId: req.params.id,
+        checkedIn: true, // チェックインしている人のみ
         dropped: false,
         cancelledAt: null, // キャンセルされていない参加者のみ
       },
@@ -719,9 +1182,9 @@ router.get('/:id/standings', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(participants.map((p, index) => ({
+    res.json(participants.map((p) => ({
       participant: p,
-      rank: index + 1,
+      rank: p.rank,
       points: p.points,
       omw: p.omw,
       gameWins: p.gameWins,
@@ -736,6 +1199,8 @@ router.get('/:id/standings', authenticate, async (req: AuthRequest, res) => {
 // 大会開始
 router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {
+    const { preliminaryRounds, maxRounds } = req.body
+
     const tournament = await prisma.tournament.findUnique({
       where: { id: req.params.id },
       include: {
@@ -755,8 +1220,36 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
       return res.status(403).json({ message: '権限がありません' })
     }
 
-    if (tournament.status !== 'DRAFT' && tournament.status !== 'REGISTRATION') {
+    if (tournament.status !== 'DRAFT' && tournament.status !== 'REGISTRATION' && tournament.status !== 'PREPARING') {
       return res.status(400).json({ message: 'この大会は既に開始されています' })
+    }
+
+    // 受付終了時間以降かチェック
+    const now = getJSTNow()
+    if (tournament.registrationEndTime && now < tournament.registrationEndTime) {
+      return res.status(400).json({ message: '受付終了時間以降にマッチングを作成できます' })
+    }
+    
+    // エントリー終了時間を過ぎている場合、ステータスをPREPARINGに変更
+    if (tournament.status === 'REGISTRATION' && tournament.entryEndAt && now >= tournament.entryEndAt) {
+      await prisma.tournament.update({
+        where: { id: req.params.id },
+        data: { status: 'PREPARING' },
+      })
+      // 更新後のトーナメント情報を取得
+      const updatedTournament = await prisma.tournament.findUnique({
+        where: { id: req.params.id },
+        include: {
+          participants: {
+            where: {
+              cancelledAt: null,
+            },
+          },
+        },
+      })
+      if (updatedTournament) {
+        tournament.status = updatedTournament.status as any
+      }
     }
 
     const checkedInCount = tournament.participants.filter((p) => p.checkedIn).length
@@ -764,11 +1257,30 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
       return res.status(400).json({ message: 'チェックイン済みの参加者が2名未満です' })
     }
 
+    // 予選回戦数と予選終了条件のバリデーション
+    if (preliminaryRounds === undefined || preliminaryRounds === null) {
+      return res.status(400).json({ message: '予選回戦数または予選終了条件を指定してください' })
+    }
+
+    // maxRoundsの計算
+    let calculatedMaxRounds = maxRounds
+    if (typeof preliminaryRounds === 'number') {
+      calculatedMaxRounds = preliminaryRounds
+    } else if (preliminaryRounds === 'until_one_undefeated' || preliminaryRounds === 'until_two_undefeated') {
+      // 無敗が1人または2人になるまで続ける場合、maxRoundsは参加者数に応じて設定
+      calculatedMaxRounds = Math.ceil(Math.log2(checkedInCount)) + 1
+    }
+
+    // ステータスをPREPARINGからIN_PROGRESSに変更（マッチング作成時）
+    // ただし、対戦表はまだ参加者には見えない状態（matchesVisible: false）
     await prisma.tournament.update({
       where: { id: req.params.id },
       data: {
         status: 'IN_PROGRESS',
         startedAt: new Date(),
+        preliminaryRounds: JSON.stringify(preliminaryRounds),
+        maxRounds: calculatedMaxRounds || 0,
+        matchesVisible: false, // 対戦表はまだ非公開
       },
     })
 
@@ -795,6 +1307,103 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
   }
 })
 
+// 全試合終了チェック
+router.get('/:id/rounds/:round/completed', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const round = parseInt(req.params.round)
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 該当回戦の全試合を取得
+    const matches = await prisma.match.findMany({
+      where: {
+        tournamentId: req.params.id,
+        round,
+      },
+    })
+
+    // 全試合が終了しているかチェック
+    const allCompleted = matches.length > 0 && matches.every(m => m.result !== null)
+
+    res.json({ completed: allCompleted, totalMatches: matches.length, completedMatches: matches.filter(m => m.result !== null).length })
+  } catch (error: any) {
+    console.error('Check round completed error:', error)
+    res.status(500).json({ message: error.message || 'チェックに失敗しました' })
+  }
+})
+
+// 次の回戦を作成
+router.post('/:id/next-round', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    const currentRound = tournament.currentRound || 0
+    const maxRounds = tournament.maxRounds || 0
+
+    // 予定回戦数が残っているかチェック
+    if (currentRound >= maxRounds) {
+      return res.status(400).json({ message: '予定回戦数に達しています' })
+    }
+
+    // 現在の回戦が0の場合は、第1回戦がまだ作成されていない
+    if (currentRound === 0) {
+      return res.status(400).json({ message: '第1回戦がまだ作成されていません' })
+    }
+
+    // 現在の回戦の全試合が終了しているかチェック
+    const currentRoundMatches = await prisma.match.findMany({
+      where: {
+        tournamentId: req.params.id,
+        round: currentRound,
+      },
+    })
+
+    if (currentRoundMatches.length === 0) {
+      return res.status(400).json({ message: '現在の回戦に試合がありません' })
+    }
+
+    const allCompleted = currentRoundMatches.every(m => m.result !== null)
+    if (!allCompleted) {
+      return res.status(400).json({ message: '現在の回戦の全試合が終了していません' })
+    }
+
+    // 次の回戦を作成
+    const nextRound = currentRound + 1
+    const matches = await generatePairings(req.params.id, nextRound)
+
+    res.json({
+      round: nextRound,
+      matches: matches.map(transformMatch),
+    })
+  } catch (error: any) {
+    console.error('Create next round error:', error)
+    console.error('Error stack:', error.stack)
+    res.status(500).json({ 
+      message: error.message || '次の回戦の作成に失敗しました',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+})
+
 // マッチング生成
 router.post('/:id/rounds/:round/pairings', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {
@@ -804,6 +1413,87 @@ router.post('/:id/rounds/:round/pairings', authenticate, requireRole('organizer'
   } catch (error: any) {
     console.error('Generate pairings error:', error)
     res.status(500).json({ message: error.message || 'マッチングの生成に失敗しました' })
+  }
+})
+
+// 対戦開始（対戦表を参加者に公開）
+router.post('/:id/start-matches', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // 対戦表を公開
+    await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: { matchesVisible: true },
+    })
+
+    const updatedTournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      include: {
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    })
+
+    res.json(transformTournament(updatedTournament!))
+  } catch (error) {
+    console.error('Start matches error:', error)
+    res.status(500).json({ message: '対戦開始に失敗しました' })
+  }
+})
+
+// 再マッチング（第1回戦の対戦表を再作成）
+router.post('/:id/rematch-round1', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // 第1回戦の既存のマッチを削除
+    await prisma.match.deleteMany({
+      where: {
+        tournamentId: req.params.id,
+        round: 1,
+      },
+    })
+
+    // 再マッチング
+    const matches = await generatePairings(req.params.id, 1)
+    res.json(matches.map(transformMatch))
+  } catch (error: any) {
+    console.error('Rematch round 1 error:', error)
+    res.status(500).json({ message: error.message || '対戦表の再作成に失敗しました' })
   }
 })
 
@@ -850,22 +1540,22 @@ router.patch('/:id/matches/:matchId/points', authenticate, requireRole('organize
       return res.status(400).json({ message: '無効なリクエストです' })
     }
 
-    if (!result || !['player1', 'player2', 'draw'].includes(result.toLowerCase())) {
-      return res.status(400).json({ message: '有効な結果を指定してください（player1, player2, draw）' })
+    if (!result || !['player1', 'player2', 'draw', 'both_loss'].includes(result.toLowerCase())) {
+      return res.status(400).json({ message: '有効な結果を指定してください（player1, player2, draw, both_loss）' })
     }
 
-    const newResult = result.toUpperCase() as 'PLAYER1' | 'PLAYER2' | 'DRAW'
+    const newResult = result.toUpperCase() as 'PLAYER1' | 'PLAYER2' | 'DRAW' | 'BOTH_LOSS'
     const oldResult = match.result
 
     // 既存の結果がある場合、勝ち点を減算
     if (oldResult) {
       const oldPlayer1Wins = oldResult === 'PLAYER1' ? 1 : 0
-      const oldPlayer1Losses = oldResult === 'PLAYER2' ? 1 : 0
+      const oldPlayer1Losses = oldResult === 'PLAYER2' || oldResult === 'BOTH_LOSS' ? 1 : 0
       const oldPlayer1Draws = oldResult === 'DRAW' ? 1 : 0
       const oldPlayer1Points = oldResult === 'PLAYER1' ? 3 : oldResult === 'DRAW' ? 1 : 0
 
       const oldPlayer2Wins = oldResult === 'PLAYER2' ? 1 : 0
-      const oldPlayer2Losses = oldResult === 'PLAYER1' ? 1 : 0
+      const oldPlayer2Losses = oldResult === 'PLAYER1' || oldResult === 'BOTH_LOSS' ? 1 : 0
       const oldPlayer2Draws = oldResult === 'DRAW' ? 1 : 0
       const oldPlayer2Points = oldResult === 'PLAYER2' ? 3 : oldResult === 'DRAW' ? 1 : 0
 
@@ -925,12 +1615,12 @@ router.patch('/:id/matches/:matchId/points', authenticate, requireRole('organize
 
     // 新しい勝ち点を加算
     const newPlayer1Wins = newResult === 'PLAYER1' ? 1 : 0
-    const newPlayer1Losses = newResult === 'PLAYER2' ? 1 : 0
+    const newPlayer1Losses = newResult === 'PLAYER2' || newResult === 'BOTH_LOSS' ? 1 : 0
     const newPlayer1Draws = newResult === 'DRAW' ? 1 : 0
     const newPlayer1Points = newResult === 'PLAYER1' ? 3 : newResult === 'DRAW' ? 1 : 0
 
     const newPlayer2Wins = newResult === 'PLAYER2' ? 1 : 0
-    const newPlayer2Losses = newResult === 'PLAYER1' ? 1 : 0
+    const newPlayer2Losses = newResult === 'PLAYER1' || newResult === 'BOTH_LOSS' ? 1 : 0
     const newPlayer2Draws = newResult === 'DRAW' ? 1 : 0
     const newPlayer2Points = newResult === 'PLAYER2' ? 3 : newResult === 'DRAW' ? 1 : 0
 
@@ -954,11 +1644,19 @@ router.patch('/:id/matches/:matchId/points', authenticate, requireRole('organize
       },
     })
 
-    // 順位を再計算
-    await calculateStandings(req.params.id)
-
     const transformedMatch = transformMatch(updatedMatch)
+
+    // レスポンスを先に返す
     res.json(transformedMatch)
+
+    // 管理者/開催者が結果を修正した場合は常に順位計算を実行（非同期で実行）
+    ;(async () => {
+      try {
+        await calculateStandings(req.params.id)
+      } catch (error) {
+        console.error('Background standings calculation error:', error)
+      }
+    })()
   } catch (error) {
     console.error('Update points error:', error)
     res.status(500).json({ message: '勝ち点の更新に失敗しました' })
@@ -980,6 +1678,64 @@ router.post('/:id/participants/:participantId/drop', authenticate, requireRole('
   } catch (error) {
     console.error('Drop participant error:', error)
     res.status(500).json({ message: '棄権処理に失敗しました' })
+  }
+})
+
+// アナウンス取得
+router.get('/:id/announcement', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        announcement: true,
+      },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    res.json({ announcement: tournament.announcement || '' })
+  } catch (error) {
+    console.error('Get announcement error:', error)
+    res.status(500).json({ message: 'アナウンスの取得に失敗しました' })
+  }
+})
+
+// アナウンス更新（主催者/管理者のみ）
+router.patch('/:id/announcement', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 主催者または管理者のみ編集可能
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'アナウンスの編集権限がありません' })
+    }
+
+    const { announcement } = req.body
+
+    const updatedTournament = await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: {
+        announcement: announcement || null,
+      },
+      select: {
+        id: true,
+        announcement: true,
+      },
+    })
+
+    res.json({ announcement: updatedTournament.announcement || '' })
+  } catch (error) {
+    console.error('Update announcement error:', error)
+    res.status(500).json({ message: 'アナウンスの更新に失敗しました' })
   }
 })
 
