@@ -46,8 +46,8 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(tournaments.map((tournament) => {
-      const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
+    res.json(tournaments.map((tournament: any) => {
+      const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
       const transformed = transformTournament(tournament)
       return {
         ...transformed,
@@ -85,7 +85,7 @@ router.get('/my-participations', authenticate, async (req: AuthRequest, res) => 
       },
     })
 
-    const result = participants.map((p) => ({
+    const result = participants.map((p: any) => ({
       tournament: transformTournament(p.tournament),
       participant: {
         id: p.id,
@@ -298,8 +298,8 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
       : false
 
     // 定員内の参加者数
-    const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
-    const waitlistCount = tournament.participants.filter(p => p.isWaitlist).length
+    const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
+    const waitlistCount = tournament.participants.filter((p: any) => p.isWaitlist).length
     
     // デバッグ用（本番では削除可能）
     console.log('Entry status calculation:', {
@@ -308,7 +308,7 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
       confirmedCount,
       waitlistCount,
       capacity: tournament.capacity,
-      participants: tournament.participants.map(p => ({
+      participants: tournament.participants.map((p: any) => ({
         id: p.id,
         userId: p.userId,
         isWaitlist: p.isWaitlist,
@@ -317,7 +317,7 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
     })
 
     // 現在のユーザーのエントリー状況
-    const myEntry = tournament.participants.find(p => p.userId === req.userId!)
+    const myEntry = tournament.participants.find((p: any) => p.userId === req.userId!)
 
     res.json({
       tournament: transformTournament(tournament),
@@ -823,7 +823,7 @@ router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, re
     })
 
     // 定員内の参加者数を計算
-    const confirmedCount = tournament.participants.filter(p => !p.isWaitlist).length
+    const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
     // 参加者として追加（エントリー済みだが、チェックインは未チェック）
@@ -1182,7 +1182,7 @@ router.get('/:id/standings', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(participants.map((p) => ({
+    res.json(participants.map((p: any) => ({
       participant: p,
       rank: p.rank,
       points: p.points,
@@ -1252,7 +1252,7 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
       }
     }
 
-    const checkedInCount = tournament.participants.filter((p) => p.checkedIn).length
+    const checkedInCount = tournament.participants.filter((p: any) => p.checkedIn).length
     if (checkedInCount < 2) {
       return res.status(400).json({ message: 'チェックイン済みの参加者が2名未満です' })
     }
@@ -1381,7 +1381,7 @@ router.post('/:id/next-round', authenticate, requireRole('organizer', 'admin'), 
       return res.status(400).json({ message: '現在の回戦に試合がありません' })
     }
 
-    const allCompleted = currentRoundMatches.every(m => m.result !== null)
+    const allCompleted = currentRoundMatches.every((m: any) => m.result !== null)
     if (!allCompleted) {
       return res.status(400).json({ message: '現在の回戦の全試合が終了していません' })
     }
