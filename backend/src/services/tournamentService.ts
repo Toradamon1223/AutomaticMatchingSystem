@@ -245,6 +245,45 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         // それでもペアが見つからなかった場合（奇数人数）
         if (!foundOpponent) {
           // バイ（不戦勝）として扱う
+          // マッチレコードを作成して、試合数を正しくカウントできるようにする
+          const byeMatch = await prisma.match.create({
+            data: {
+              tournamentId,
+              round,
+              matchNumber: matchNumber++,
+              player1Id: player1.id,
+              player2Id: player1.id, // バイの場合は自分自身を設定（特別な値として扱う）
+              tableNumber: tableNumber++,
+              isTournamentMatch: false,
+              result: 'PLAYER1', // バイを受けたプレイヤーの勝利として自動設定
+            },
+            include: {
+              player1: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+              player2: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+          
+          matches.push(byeMatch)
+          
+          // 参加者の成績を更新
           await prisma.participant.update({
             where: { id: player1.id },
             data: {
