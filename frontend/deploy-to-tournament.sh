@@ -13,6 +13,10 @@ if [ "$(basename $(pwd))" != "Tournament" ]; then
     exit 1
 fi
 
+# Gitから最新のコードを取得
+echo "最新のコードを取得中..."
+git pull || echo "警告: git pullに失敗しました（ローカルの変更がある可能性があります）"
+
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
 export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/api}"
@@ -34,6 +38,15 @@ echo "権限を設定中..."
 sudo chown -R www-data:www-data .
 sudo chmod -R 755 .
 
-echo "デプロイ完了！"
+# バックエンドの再ビルドと再起動
+echo "バックエンドを再ビルド中..."
+cd backend
+npm install
+npm run build
+echo "バックエンドを再起動中..."
+pm2 restart tcg-backend || echo "警告: PM2の再起動に失敗しました（プロセスが存在しない可能性があります）"
+
+echo ""
+echo "✓ デプロイ完了！"
 echo "URL: https://pcg-kansai-judge.jp/Tournament"
 
