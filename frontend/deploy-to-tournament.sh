@@ -23,6 +23,9 @@ fi
 # 最新のコードを取得
 git pull
 
+# デプロイスクリプト自体に実行権限を付与（git pullで権限がリセットされる可能性があるため）
+chmod +x frontend/deploy-to-tournament.sh
+
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
 export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/api}"
