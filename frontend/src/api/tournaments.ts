@@ -221,8 +221,8 @@ export const addGuestParticipant = async (tournamentId: string, playerName: stri
   return response.data
 }
 
-export const rematchRound = async (tournamentId: string, round: number): Promise<Match[]> => {
-  const response = await apiClient.post<Match[]>(
+export const rematchRound = async (tournamentId: string, round: number): Promise<{ round: number; matches: Match[] }> => {
+  const response = await apiClient.post<{ round: number; matches: Match[] }>(
     `/tournaments/${tournamentId}/rounds/${round}/rematch`
   )
   return response.data

@@ -1955,35 +1955,64 @@ export default function TournamentDetailPage() {
                                   : '対戦表を確認し、「開始」ボタンを押すと参加者が結果を登録できるようになります'}
                               </p>
                             </div>
-                            <button
-                              onClick={async () => {
-                                if (!id) return
-                                if (!confirm(`第${selectedRound}回戦を開始しますか？\n開始後、参加者が結果を登録できるようになります。`)) return
-                                try {
-                                  await startRound(id, selectedRound)
-                                  alert(`第${selectedRound}回戦を開始しました`)
-                                  await loadTournament()
-                                  await loadMatches(selectedRound)
-                                } catch (error: any) {
-                                  console.error('Start round error:', error)
-                                  const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
-                                  alert(errorMessage)
-                                }
-                              }}
-                              style={{
-                                padding: '12px 24px',
-                                backgroundColor: '#4CAF50',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 'bold',
-                                fontSize: '16px',
-                                marginRight: '10px',
-                              }}
-                            >
-                              開始
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button
+                                onClick={async () => {
+                                  if (!id) return
+                                  if (!confirm(`第${selectedRound}回戦の対戦表を再作成しますか？\n現在のプレビュー対戦表は削除され、新しい対戦表が作成されます。`)) return
+                                  try {
+                                    await rematchRound(id, selectedRound)
+                                    alert(`第${selectedRound}回戦の対戦表を再作成しました`)
+                                    await loadTournament()
+                                    await loadMatches(selectedRound)
+                                  } catch (error: any) {
+                                    console.error('Rematch round error:', error)
+                                    const errorMessage = error.response?.data?.message || error.message || '再マッチに失敗しました'
+                                    alert(errorMessage)
+                                  }
+                                }}
+                                style={{
+                                  padding: '12px 24px',
+                                  backgroundColor: '#FF9800',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold',
+                                  fontSize: '16px',
+                                }}
+                              >
+                                再マッチ
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!id) return
+                                  if (!confirm(`第${selectedRound}回戦を開始しますか？\n開始後、参加者が結果を登録できるようになります。`)) return
+                                  try {
+                                    await startRound(id, selectedRound)
+                                    alert(`第${selectedRound}回戦を開始しました`)
+                                    await loadTournament()
+                                    await loadMatches(selectedRound)
+                                  } catch (error: any) {
+                                    console.error('Start round error:', error)
+                                    const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
+                                    alert(errorMessage)
+                                  }
+                                }}
+                                style={{
+                                  padding: '12px 24px',
+                                  backgroundColor: '#4CAF50',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold',
+                                  fontSize: '16px',
+                                }}
+                              >
+                                開始
+                              </button>
+                            </div>
                           </div>
                         )}
 
