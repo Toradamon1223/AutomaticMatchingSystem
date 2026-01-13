@@ -1794,7 +1794,17 @@ export default function TournamentDetailPage() {
                 <div>
                   {/* 回戦タブ */}
                   {(() => {
-                    const rounds = Array.from(new Set(matches.map(m => m.round))).sort((a, b) => a - b)
+                    // マッチから取得したラウンドと、tournament.currentRoundから推測されるラウンドを結合
+                    const matchRounds = Array.from(new Set(matches.map(m => m.round)))
+                    const maxRound = Math.max(
+                      ...matchRounds,
+                      tournament.currentRound || 1,
+                      tournament.maxRounds || 1
+                    )
+                    // 1回戦から最大ラウンドまで全てのラウンドを生成
+                    const allRounds = Array.from({ length: maxRound }, (_, i) => i + 1)
+                    const rounds = Array.from(new Set([...allRounds, ...matchRounds])).sort((a, b) => a - b)
+                    
                     const currentRoundMatches = matches.filter(m => m.round === selectedRound)
                     const completedCount = currentRoundMatches.filter(m => m.result).length
                     const totalCount = currentRoundMatches.length
