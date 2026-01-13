@@ -874,8 +874,9 @@ router.get('/:id/matches', authenticate, async (req: AuthRequest, res) => {
     }
 
     const where: any = { tournamentId: req.params.id }
-    if (round) {
-      where.round = parseInt(round as string)
+    const requestedRound = round ? parseInt(round as string) : null
+    if (requestedRound) {
+      where.round = requestedRound
     }
 
     const matches = await prisma.match.findMany({
@@ -909,7 +910,45 @@ router.get('/:id/matches', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(matches.map(transformMatch))
+    // その回戦以前の勝ち点を計算
+    const pointsBeforeRoundMap = new Map<string, number>()
+    if (requestedRound) {
+      // その回戦以前のマッチを取得
+      const previousMatches = await prisma.match.findMany({
+        where: {
+          tournamentId: req.params.id,
+          round: { lt: requestedRound },
+          result: { not: null },
+        },
+      })
+
+      // 各プレイヤーの勝ち点を計算
+      for (const prevMatch of previousMatches) {
+        const result = prevMatch.result?.toUpperCase()
+        let player1Points = 0
+        let player2Points = 0
+
+        if (result === 'PLAYER1') {
+          player1Points = 3
+        } else if (result === 'PLAYER2') {
+          player2Points = 3
+        } else if (result === 'DRAW') {
+          player1Points = 1
+          player2Points = 1
+        }
+        // BOTH_LOSSの場合は0点
+
+        const current1 = pointsBeforeRoundMap.get(prevMatch.player1Id) || 0
+        const current2 = pointsBeforeRoundMap.get(prevMatch.player2Id) || 0
+        pointsBeforeRoundMap.set(prevMatch.player1Id, current1 + player1Points)
+        pointsBeforeRoundMap.set(prevMatch.player2Id, current2 + player2Points)
+      }
+    }
+
+    res.json(matches.map(match => transformMatch(match, {
+      player1Points: pointsBeforeRoundMap.get(match.player1Id) || 0,
+      player2Points: pointsBeforeRoundMap.get(match.player2Id) || 0,
+    })))
   } catch (error) {
     console.error('Get matches error:', error)
     res.status(500).json({ message: '対戦一覧の取得に失敗しました' })

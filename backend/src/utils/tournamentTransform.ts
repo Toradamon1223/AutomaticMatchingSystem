@@ -26,17 +26,19 @@ export function transformTournament(tournament: PrismaTournament & { organizer?:
   }
 }
 
-export function transformMatch(match: any) {
+export function transformMatch(match: any, pointsBeforeRound?: { player1Points: number; player2Points: number }) {
   return {
     ...match,
     result: match.result ? match.result.toLowerCase() : null,
     player1: {
       ...match.player1,
       user: match.player1.user,
+      pointsBeforeRound: pointsBeforeRound?.player1Points,
     },
     player2: {
       ...match.player2,
       user: match.player2.user,
+      pointsBeforeRound: pointsBeforeRound?.player2Points,
     },
   }
 }

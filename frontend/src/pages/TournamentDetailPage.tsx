@@ -2282,6 +2282,16 @@ export default function TournamentDetailPage() {
                                           minWidth: 0,
                                         }}>
                                           {match.player1.user.name}
+                                          {match.player1.pointsBeforeRound !== undefined && (
+                                            <span style={{
+                                              marginLeft: '6px',
+                                              fontSize: isMobile ? '10px' : '11px',
+                                              color: isDark ? '#aaa' : '#666',
+                                              fontWeight: 'normal',
+                                            }}>
+                                              ({match.player1.pointsBeforeRound}点)
+                                            </span>
+                                          )}
                                         </div>
                                         
                                         {/* スコアボックス */}
@@ -2339,6 +2349,16 @@ export default function TournamentDetailPage() {
                                           minWidth: 0,
                                         }}>
                                           {match.player2.user.name}
+                                          {match.player2.pointsBeforeRound !== undefined && (
+                                            <span style={{
+                                              marginLeft: '6px',
+                                              fontSize: isMobile ? '10px' : '11px',
+                                              color: isDark ? '#aaa' : '#666',
+                                              fontWeight: 'normal',
+                                            }}>
+                                              ({match.player2.pointsBeforeRound}点)
+                                            </span>
+                                          )}
                                         </div>
                                         
                                         {/* スコアボックス */}

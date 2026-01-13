@@ -66,6 +66,7 @@ export interface Participant {
   tournamentWins: number
   tournamentLosses: number
   tournamentEliminated: boolean
+  pointsBeforeRound?: number // その回戦以前の勝ち点
 }
 
 export interface Match {
