@@ -189,7 +189,10 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     let matchesInThisGroup = 0
     while (group.length >= 2) {
       const player1 = group.shift()!
-      if (used.has(player1.id)) continue
+      if (used.has(player1.id)) {
+        console.log(`[generatePairings] Round ${round}: Record ${record} - Player ${player1.id} already used, skipping`)
+        continue
+      }
 
       // 既に対戦していない相手を探す
       const opponents1 = previousOpponents.get(player1.id) || new Set()
@@ -242,6 +245,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         group.splice(i, 1) // マッチした相手をグループから削除
         paired = true
         matchesInThisGroup++
+        console.log(`[generatePairings] Round ${round}: Record ${record} - Paired ${player1.id} with ${player2.id}`)
         break
       }
 
@@ -300,6 +304,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
             recordGroups.set(nextRecord, nextGroup)
             foundOpponent = true
             matchesInThisGroup++
+            console.log(`[generatePairings] Round ${round}: Record ${record} - Paired ${player1.id} with ${opponent.id} from ${nextRecord}`)
             break
           }
           
@@ -308,6 +313,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
 
         // それでもペアが見つからなかった場合（奇数人数）
         if (!foundOpponent) {
+          console.log(`[generatePairings] Round ${round}: Record ${record} - No opponent found for ${player1.id}, creating BYE match`)
           // バイ（不戦勝）として扱う
           // バイの場合は、player2Idに自分自身を設定し、player2の名前を"BYE"として表示する
           // マッチレコードを作成して、試合数を正しくカウントできるようにする
@@ -360,6 +366,13 @@ export async function generatePairings(tournamentId: string, round: number): Pro
           })
           used.add(player1.id)
           matchesInThisGroup++
+        } else {
+          // pairedがfalseで、foundOpponentがtrueの場合、player1は既にusedに追加されている
+          // しかし、pairedがfalseのままなので、ここで確認
+          if (!used.has(player1.id)) {
+            console.error(`[generatePairings] Round ${round}: Record ${record} - Player ${player1.id} was not added to used set after pairing!`)
+            used.add(player1.id)
+          }
         }
       }
     }
