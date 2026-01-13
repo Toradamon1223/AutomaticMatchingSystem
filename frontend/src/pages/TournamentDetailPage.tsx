@@ -334,10 +334,10 @@ export default function TournamentDetailPage() {
     setEditingData({
       name: tournament.name,
       description: tournament.description || '',
-      logoImageUrl: tournament.logoImageUrl || '',
-      entryFee: tournament.entryFee ?? null,
-      venueName: tournament.venueName || '',
-      venueAddress: tournament.venueAddress || '',
+      logoImageUrl: (tournament as any).logoImageUrl || '',
+      entryFee: (tournament as any).entryFee ?? null,
+      venueName: (tournament as any).venueName || '',
+      venueAddress: (tournament as any).venueAddress || '',
       eventDate: tournament.eventDate || '',
       registrationTime: tournament.registrationTime || '',
       registrationEndTime: tournament.registrationEndTime || '',
@@ -345,7 +345,7 @@ export default function TournamentDetailPage() {
       capacity: tournament.capacity ?? null,
       entryStartAt: tournament.entryStartAt || '',
       entryEndAt: tournament.entryEndAt || '',
-      isPublic: tournament.isPublic !== undefined ? tournament.isPublic : true,
+      isPublic: (tournament as any).isPublic !== undefined ? (tournament as any).isPublic : true,
     })
     setIsEditing(true)
   }
@@ -1080,13 +1080,13 @@ export default function TournamentDetailPage() {
           ) : (
             <>
               {/* ロゴ画像 */}
-              {tournament.logoImageUrl && (
+              {(tournament as any).logoImageUrl && (
                 <div
                   style={{
                     width: '100%',
                     height: '300px',
                     backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
-                    backgroundImage: `url(${tournament.logoImageUrl})`,
+                    backgroundImage: `url(${(tournament as any).logoImageUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
@@ -1116,7 +1116,7 @@ export default function TournamentDetailPage() {
                   }}
                 >
             {/* 会場名 */}
-            {tournament.venueName && (
+            {(tournament as any).venueName && (
               <div
                 style={{
                   marginBottom: '15px',
@@ -1128,12 +1128,12 @@ export default function TournamentDetailPage() {
                 }}
               >
                 <span>📍</span>
-                <span>{tournament.venueName}</span>
+                <span>{(tournament as any).venueName}</span>
               </div>
             )}
 
             {/* 住所 */}
-            {tournament.venueAddress && (
+            {(tournament as any).venueAddress && (
               <div
                 style={{
                   marginBottom: '15px',
@@ -1145,7 +1145,7 @@ export default function TournamentDetailPage() {
                 }}
               >
                 <span>📍</span>
-                <span>{tournament.venueAddress}</span>
+                <span>{(tournament as any).venueAddress}</span>
               </div>
             )}
 
@@ -1203,7 +1203,7 @@ export default function TournamentDetailPage() {
             )}
 
             {/* 参加費 */}
-            {tournament.entryFee !== undefined && tournament.entryFee !== null && (
+            {(tournament as any).entryFee !== undefined && (tournament as any).entryFee !== null && (
               <div
                 style={{
                   marginBottom: '15px',
@@ -1215,7 +1215,7 @@ export default function TournamentDetailPage() {
                 }}
               >
                 <span>💰</span>
-                <span>{tournament.entryFee === 0 ? '無料' : `¥${tournament.entryFee.toLocaleString()}`}</span>
+                <span>{(tournament as any).entryFee === 0 ? '無料' : `¥${((tournament as any).entryFee).toLocaleString()}`}</span>
               </div>
             )}
 
@@ -1692,7 +1692,7 @@ export default function TournamentDetailPage() {
               {/* 管理ボタン */}
               {canEditTournament && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
-                  {!tournament.matchesVisible && (
+                  {!(tournament as any).matchesVisible && (
                     <button
                       onClick={async () => {
                         if (!id) return
@@ -1782,7 +1782,7 @@ export default function TournamentDetailPage() {
                 </button>
               </div>
 
-              {!tournament.matchesVisible && !canEditTournament ? (
+              {!(tournament as any).matchesVisible && !canEditTournament ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
                   <p>対戦表はまだ公開されていません</p>
                 </div>
