@@ -1811,6 +1811,62 @@ router.get('/:id/announcement', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
+// トーナメントリセット（1回戦開始前に戻す、主催者/管理者のみ）
+router.post('/:id/reset', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    // すべてのマッチを削除
+    await prisma.match.deleteMany({
+      where: { tournamentId: req.params.id },
+    })
+
+    // 参加者の成績をリセット
+    await prisma.participant.updateMany({
+      where: { tournamentId: req.params.id },
+      data: {
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        points: 0,
+        omw: 0,
+        gameWins: 0,
+        averageOmw: 0,
+        rank: 0,
+        tournamentWins: 0,
+        tournamentLosses: 0,
+        tournamentEliminated: false,
+      },
+    })
+
+    // トーナメントの状態をリセット
+    await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: {
+        currentRound: 0,
+        maxRounds: 0,
+        status: 'PREPARING',
+        matchesVisible: false,
+      },
+    })
+
+    res.json({ message: 'トーナメントを1回戦開始前にリセットしました' })
+  } catch (error) {
+    console.error('Reset tournament error:', error)
+    res.status(500).json({ message: 'トーナメントのリセットに失敗しました' })
+  }
+})
+
 // アナウンス更新（主催者/管理者のみ）
 router.patch('/:id/announcement', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {

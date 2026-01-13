@@ -252,3 +252,9 @@ export const updateAnnouncement = async (tournamentId: string, announcement: str
   return response.data
 }
 
+// トーナメントリセット（1回戦開始前に戻す、主催者/管理者のみ）
+export const resetTournament = async (tournamentId: string): Promise<{ message: string }> => {
+  const response = await apiClient.post<{ message: string }>(`/tournaments/${tournamentId}/reset`)
+  return response.data
+}
+

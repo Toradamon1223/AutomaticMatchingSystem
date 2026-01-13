@@ -22,6 +22,7 @@ import {
   getStandings,
   createNextRound,
   startRound,
+  resetTournament,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
 import { format } from 'date-fns'

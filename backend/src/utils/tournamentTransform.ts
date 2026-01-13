@@ -27,6 +27,9 @@ export function transformTournament(tournament: PrismaTournament & { organizer?:
 }
 
 export function transformMatch(match: any, pointsBeforeRound?: { player1Points: number; player2Points: number }) {
+  // バイの試合（player1Id === player2Id）の場合、player2の名前を"BYE"として表示
+  const isBye = match.player1Id === match.player2Id
+  
   return {
     ...match,
     result: match.result ? match.result.toLowerCase() : null,
@@ -37,8 +40,8 @@ export function transformMatch(match: any, pointsBeforeRound?: { player1Points: 
     },
     player2: {
       ...match.player2,
-      user: match.player2.user,
-      pointsBeforeRound: pointsBeforeRound?.player2Points,
+      user: isBye ? { ...match.player2.user, name: 'BYE' } : match.player2.user,
+      pointsBeforeRound: isBye ? undefined : pointsBeforeRound?.player2Points,
     },
   }
 }
