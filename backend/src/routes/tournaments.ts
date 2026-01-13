@@ -1447,7 +1447,7 @@ router.post('/:id/rounds/:round/start', authenticate, requireRole('organizer', '
       return res.status(403).json({ message: '権限がありません' })
     }
 
-    if (tournament.status !== 'in_progress') {
+    if (tournament.status !== 'IN_PROGRESS') {
       return res.status(400).json({ message: '大会が開始されていません' })
     }
 
