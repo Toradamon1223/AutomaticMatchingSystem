@@ -389,11 +389,15 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       : 0
 
     // 勝手累点（ゲームウィン）は現在の実装ではwinsと同じ
-    const gameWins = participant.wins
+    const gameWins = wins
 
     return prisma.participant.update({
       where: { id: participant.id },
       data: {
+        wins,
+        losses,
+        draws,
+        points,
         omw,
         averageOmw,
         gameWins,
