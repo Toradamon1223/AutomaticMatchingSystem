@@ -1500,6 +1500,65 @@ router.post('/:id/next-round', authenticate, requireRole('organizer', 'admin'), 
   }
 })
 
+// 再マッチング（プレビューマッチを削除して新しいプレビューマッチを作成）
+router.post('/:id/rounds/:round/rematch', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const round = parseInt(req.params.round)
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // 既に開始されている回戦（isTournamentMatch: trueのマッチがある）は再マッチできない
+    const activeMatches = await prisma.match.findMany({
+      where: {
+        tournamentId: req.params.id,
+        round: round,
+        isTournamentMatch: true,
+      },
+    })
+
+    if (activeMatches.length > 0) {
+      return res.status(400).json({ message: '既に開始されている回戦は再マッチできません' })
+    }
+
+    // 既存のプレビューマッチを削除
+    await prisma.match.deleteMany({
+      where: {
+        tournamentId: req.params.id,
+        round: round,
+        isTournamentMatch: false,
+      },
+    })
+
+    // 新しいプレビューマッチを作成
+    const matches = await generatePairings(req.params.id, round)
+
+    res.json({
+      round: round,
+      matches: matches.map(m => transformMatch(m)),
+    })
+  } catch (error: any) {
+    console.error('Rematch error:', error)
+    console.error('Error stack:', error.stack)
+    res.status(500).json({ 
+      message: error.message || '再マッチに失敗しました',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
+  }
+})
+
 // マッチング生成
 router.post('/:id/rounds/:round/pairings', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
   try {

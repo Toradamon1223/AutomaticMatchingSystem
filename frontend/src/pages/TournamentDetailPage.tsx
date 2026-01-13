@@ -21,6 +21,7 @@ import {
   getStandings,
   createNextRound,
   startRound,
+  rematchRound,
   resetTournament,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
