@@ -1328,9 +1328,9 @@ router.get('/:id/rounds/:round/completed', authenticate, async (req: AuthRequest
     })
 
     // 全試合が終了しているかチェック
-    const allCompleted = matches.length > 0 && matches.every(m => m.result !== null)
+    const allCompleted = matches.length > 0 && matches.every((m: any) => m.result !== null)
 
-    res.json({ completed: allCompleted, totalMatches: matches.length, completedMatches: matches.filter(m => m.result !== null).length })
+    res.json({ completed: allCompleted, totalMatches: matches.length, completedMatches: matches.filter((m: any) => m.result !== null).length })
   } catch (error: any) {
     console.error('Check round completed error:', error)
     res.status(500).json({ message: error.message || 'チェックに失敗しました' })
