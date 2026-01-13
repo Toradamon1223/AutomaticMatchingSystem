@@ -1937,14 +1937,16 @@ export default function TournamentDetailPage() {
                                 color: isDark ? '#fff' : '#333',
                                 fontWeight: 'bold',
                               }}>
-                                第{selectedRound}回戦の対戦表（プレビュー）
+                                第{selectedRound}回戦の対戦表{activeMatches.length > 0 ? '（一部未開始）' : '（プレビュー）'}
                               </p>
                               <p style={{ 
                                 margin: 0,
                                 fontSize: '14px',
                                 color: isDark ? '#aaa' : '#666',
                               }}>
-                                対戦表を確認し、「開始」ボタンを押すと参加者が結果を登録できるようになります
+                                {activeMatches.length > 0 
+                                  ? '未開始の対戦表があります。「開始」ボタンを押すと参加者が結果を登録できるようになります'
+                                  : '対戦表を確認し、「開始」ボタンを押すと参加者が結果を登録できるようになります'}
                               </p>
                             </div>
                             <button
@@ -2026,7 +2028,7 @@ export default function TournamentDetailPage() {
                         )}
 
                         {/* 対戦表表示（プレビュー用も含む） */}
-                        {(currentRoundMatches.length === 0 && !hasPreview) ? (
+                        {(previewMatches.length === 0 && activeMatches.length === 0) ? (
                           <p style={{ color: isDark ? '#aaa' : '#666' }}>対戦がありません</p>
                         ) : (
                           <div>
