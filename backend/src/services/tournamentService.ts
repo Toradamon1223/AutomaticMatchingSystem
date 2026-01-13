@@ -91,6 +91,8 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     ],
   })
 
+  console.log(`[generatePairings] Round ${round}: Filtered to ${participants.length} participants`)
+
   if (participants.length < 2) {
     throw new Error('参加者が2名未満です')
   }
