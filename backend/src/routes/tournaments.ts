@@ -1532,6 +1532,7 @@ router.post('/:id/rounds/:round/start', authenticate, requireRole('organizer', '
       data: {
         currentRound: round,
         maxRounds: Math.max(tournament.maxRounds || 0, round),
+        matchesVisible: true, // 対戦表を参加者に公開
       },
     })
 

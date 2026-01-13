@@ -16,7 +16,6 @@ import {
   addGuestParticipant,
   forceCancelParticipant,
   startTournament,
-  startMatches,
   rematchRound1,
   reportMatchResult,
   getStandings,
@@ -1730,33 +1729,6 @@ export default function TournamentDetailPage() {
               {/* 管理ボタン */}
               {canEditTournament && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '20px' }}>
-                  {!(tournament as any).matchesVisible && (
-                    <button
-                      onClick={async () => {
-                        if (!id) return
-                        if (!confirm('対戦表を参加者に公開しますか？')) return
-                        try {
-                          await startMatches(id)
-                          alert('対戦表を公開しました')
-                          await loadTournament()
-                          await loadMatches(selectedRound)
-                        } catch (error: any) {
-                          alert(error.response?.data?.message || '対戦開始に失敗しました')
-                        }
-                      }}
-                      style={{
-                        padding: '8px 16px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      対戦開始
-                    </button>
-                  )}
                   {matches.length > 0 && selectedRound === 1 && (
                     <button
                       onClick={async () => {
@@ -2167,7 +2139,7 @@ export default function TournamentDetailPage() {
                                 display: 'grid',
                                 gridTemplateColumns: isMobile 
                                   ? 'repeat(2, 1fr)' 
-                                  : 'repeat(auto-fill, minmax(160px, 1fr))',
+                                  : 'repeat(4, 1fr)',
                                 gap: isMobile ? '10px' : '12px',
                                 padding: isMobile ? '10px 0' : '20px 0',
                               }}
@@ -2309,21 +2281,26 @@ export default function TournamentDetailPage() {
                                         <div style={{ 
                                           flex: 1,
                                           fontSize: isMobile ? '11px' : '12px',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap',
                                           minWidth: 0,
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '2px',
                                         }}>
-                                          {match.player1.user.name}
+                                          <div style={{
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                          }}>
+                                            {match.player1.user.name}
+                                          </div>
                                           {match.player1.pointsBeforeRound !== undefined && (
-                                            <span style={{
-                                              marginLeft: '6px',
-                                              fontSize: isMobile ? '10px' : '11px',
+                                            <div style={{
+                                              fontSize: isMobile ? '9px' : '10px',
                                               color: isDark ? '#aaa' : '#666',
                                               fontWeight: 'normal',
                                             }}>
-                                              ({match.player1.pointsBeforeRound}点)
-                                            </span>
+                                              {match.player1.pointsBeforeRound}点
+                                            </div>
                                           )}
                                         </div>
                                         
