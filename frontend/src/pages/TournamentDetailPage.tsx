@@ -1801,13 +1801,22 @@ export default function TournamentDetailPage() {
 
                     return (
                       <div>
-                        <div style={{ display: 'flex', gap: '5px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                        {/* ラウンド選択ボタン */}
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: isMobile ? '8px' : '10px', 
+                          marginBottom: '20px', 
+                          flexWrap: 'wrap',
+                          padding: isMobile ? '10px 0' : '15px 0',
+                          borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
+                        }}>
                           {rounds.map((round) => {
                             const roundMatches = matches.filter(m => m.round === round)
                             const roundCompleted = roundMatches.filter(m => m.result).length
                             const roundTotal = roundMatches.length
                             const isCurrentRound = round === selectedRound
                             const isActiveRound = round === tournament.currentRound
+                            const isPastRound = round < (tournament.currentRound || 0)
 
                             return (
                               <button
@@ -1817,17 +1826,81 @@ export default function TournamentDetailPage() {
                                   loadMatches(round)
                                 }}
                                 style={{
-                                  padding: '10px 20px',
-                                  backgroundColor: isCurrentRound ? (isDark ? '#333' : '#f0f0f0') : 'transparent',
-                                  color: isActiveRound && !isCurrentRound ? '#f44336' : (isDark ? '#fff' : '#333'),
-                                  border: `1px solid ${isDark ? '#333' : '#ddd'}`,
-                                  borderRadius: '6px',
+                                  padding: isMobile ? '8px 16px' : '10px 20px',
+                                  backgroundColor: isCurrentRound 
+                                    ? (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3'))
+                                    : (isActiveRound ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
+                                  color: isCurrentRound 
+                                    ? 'white'
+                                    : (isActiveRound 
+                                        ? (isDark ? '#4CAF50' : '#2e7d32')
+                                        : (isPastRound 
+                                            ? (isDark ? '#888' : '#999')
+                                            : (isDark ? '#fff' : '#333'))),
+                                  border: `2px solid ${
+                                    isCurrentRound 
+                                      ? (isActiveRound ? '#4CAF50' : '#2196F3')
+                                      : (isActiveRound 
+                                          ? (isDark ? '#4CAF50' : '#4CAF50')
+                                          : (isDark ? '#444' : '#ddd'))
+                                  }`,
+                                  borderRadius: '8px',
                                   cursor: 'pointer',
-                                  fontWeight: isCurrentRound ? 'bold' : 'normal',
-                                  fontSize: '14px',
+                                  fontWeight: isCurrentRound ? 'bold' : (isActiveRound ? '600' : 'normal'),
+                                  fontSize: isMobile ? '13px' : '14px',
+                                  transition: 'all 0.2s',
+                                  minWidth: isMobile ? '80px' : '100px',
+                                  position: 'relative',
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isCurrentRound) {
+                                    e.currentTarget.style.transform = 'translateY(-2px)'
+                                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isCurrentRound) {
+                                    e.currentTarget.style.transform = 'translateY(0)'
+                                    e.currentTarget.style.boxShadow = 'none'
+                                  }
                                 }}
                               >
-                                {round}回戦 {roundTotal > 0 && `(${roundCompleted}/${roundTotal})`}
+                                <div style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                }}>
+                                  <div style={{ fontWeight: 'bold' }}>
+                                    {round}回戦
+                                  </div>
+                                  {roundTotal > 0 && (
+                                    <div style={{ 
+                                      fontSize: isMobile ? '10px' : '11px',
+                                      opacity: 0.9,
+                                    }}>
+                                      {roundCompleted}/{roundTotal}
+                                    </div>
+                                  )}
+                                  {isActiveRound && (
+                                    <div style={{ 
+                                      fontSize: '9px',
+                                      marginTop: '2px',
+                                      opacity: 0.8,
+                                    }}>
+                                      実施中
+                                    </div>
+                                  )}
+                                  {isPastRound && roundTotal > 0 && roundCompleted === roundTotal && (
+                                    <div style={{ 
+                                      fontSize: '9px',
+                                      marginTop: '2px',
+                                      opacity: 0.7,
+                                    }}>
+                                      完了
+                                    </div>
+                                  )}
+                                </div>
                               </button>
                             )
                           })}
