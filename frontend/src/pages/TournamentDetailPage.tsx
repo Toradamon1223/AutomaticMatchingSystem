@@ -1920,9 +1920,11 @@ export default function TournamentDetailPage() {
                         {canEditTournament && 
                          currentRoundMatches.length > 0 && 
                          completedCount === totalCount && 
+                         completedCount > 0 &&
                          tournament.currentRound && 
                          tournament.maxRounds && 
-                         tournament.currentRound < tournament.maxRounds && (
+                         tournament.currentRound < tournament.maxRounds &&
+                         selectedRound === tournament.currentRound && (
                           <div style={{ marginBottom: '20px', textAlign: 'center' }}>
                             <button
                               onClick={async () => {
@@ -2081,6 +2083,7 @@ export default function TournamentDetailPage() {
                                   const player2Win = match.result === 'player2'
                                   const isDraw = match.result === 'draw'
                                   const isBothLoss = (match.result as string) === 'both_loss'
+                                  const hasResult = !!match.result
                                   
                                   // スコア計算
                                   const player1Score = player1Win ? 1 : (isDraw ? 1 : (isBothLoss ? 0 : 0))
@@ -2093,6 +2096,19 @@ export default function TournamentDetailPage() {
                                     return isDark ? '#666' : '#999' // グレー（敗北/未登録）
                                   }
 
+                                  // 背景色の決定：結果登録済みの場合は明るいグレー
+                                  const getBackgroundColor = () => {
+                                    if (hasResult) {
+                                      // 結果登録済み：明るいグレー
+                                      return isDark ? '#2a2a2a' : '#f5f5f5'
+                                    }
+                                    // 未登録：通常の背景
+                                    if (isMyMatch) {
+                                      return isDark ? '#1a3a1a' : '#e8f5e9'
+                                    }
+                                    return isDark ? '#1a1a1a' : '#fff'
+                                  }
+
                                   return (
                                     <div
                                       key={match.id}
@@ -2101,9 +2117,7 @@ export default function TournamentDetailPage() {
                                         padding: isMobile ? '10px' : '12px',
                                         border: `1px solid ${isMyMatch ? (isDark ? '#4CAF50' : '#4CAF50') : (isDark ? '#444' : '#ddd')}`,
                                         borderRadius: '8px',
-                                        backgroundColor: isMyMatch 
-                                          ? (isDark ? '#1a3a1a' : '#e8f5e9') 
-                                          : (isDark ? '#1a1a1a' : '#fff'),
+                                        backgroundColor: getBackgroundColor(),
                                         color: isDark ? '#fff' : '#333',
                                         cursor: canTap ? 'pointer' : 'default',
                                         transition: 'all 0.2s',
