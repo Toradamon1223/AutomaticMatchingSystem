@@ -314,6 +314,26 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       })),
     ]
 
+    // 実際のマッチ結果からwins, losses, draws, pointsを再計算
+    let wins = 0
+    let losses = 0
+    let draws = 0
+    let points = 0
+
+    for (const match of allMatches) {
+      const result = match.result?.toUpperCase()
+      if (result === 'PLAYER1') {
+        wins++
+        points += 3
+      } else if (result === 'PLAYER2') {
+        losses++
+      } else if (result === 'DRAW') {
+        draws++
+        points += 1
+      }
+      // BOTH_LOSSの場合は何も加算しない
+    }
+
     // OMW%計算（対戦相手のマッチ勝率の平均）
     // 各対戦相手のMW% = 対戦相手のマッチポイント / (対戦相手の総試合数 × 3)
     // MW%が33%未満の場合は33%に調整
