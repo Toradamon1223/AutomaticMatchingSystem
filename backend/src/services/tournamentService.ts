@@ -53,6 +53,8 @@ export async function generatePairings(tournamentId: string, round: number): Pro
       },
     })
 
+    console.log(`[generatePairings] Round ${round}: Found ${previousMatches.length} matches from round ${round - 1}`)
+
     const previousRoundParticipantIds = new Set<string>()
     previousMatches.forEach(match => {
       // BYEマッチ（player1Id === player2Id）も含める
@@ -61,6 +63,8 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         previousRoundParticipantIds.add(match.player2Id)
       }
     })
+
+    console.log(`[generatePairings] Round ${round}: Found ${previousRoundParticipantIds.size} unique participants from round ${round - 1}`)
 
     if (previousRoundParticipantIds.size === 0) {
       throw new Error('前の回戦の対戦データが見つかりません')
