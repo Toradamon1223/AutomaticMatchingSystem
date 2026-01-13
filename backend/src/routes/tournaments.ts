@@ -726,7 +726,7 @@ router.get('/:id/participants', authenticate, async (req: AuthRequest, res) => {
     })
 
     // isWaitlistを再計算（エントリー順で定員内かどうかを判定）
-    const maxParticipants = tournament.maxParticipants || 0
+    const maxParticipants = tournament.capacity || 0
     const result = participants.map((p: any, index: number) => {
       const isWaitlist = maxParticipants > 0 && index >= maxParticipants
       return {
