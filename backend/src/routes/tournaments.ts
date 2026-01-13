@@ -697,6 +697,14 @@ router.post('/:id/checkin', authenticate, async (req: AuthRequest, res) => {
 // 参加者一覧取得
 router.get('/:id/participants', authenticate, async (req: AuthRequest, res) => {
   try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
     const participants = await prisma.participant.findMany({
       where: {
         tournamentId: req.params.id,
@@ -717,7 +725,17 @@ router.get('/:id/participants', authenticate, async (req: AuthRequest, res) => {
       ],
     })
 
-    res.json(participants)
+    // isWaitlistを再計算（エントリー順で定員内かどうかを判定）
+    const maxParticipants = tournament.maxParticipants || 0
+    const result = participants.map((p: any, index: number) => {
+      const isWaitlist = maxParticipants > 0 && index >= maxParticipants
+      return {
+        ...p,
+        isWaitlist,
+      }
+    })
+
+    res.json(result)
   } catch (error) {
     console.error('Get participants error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
