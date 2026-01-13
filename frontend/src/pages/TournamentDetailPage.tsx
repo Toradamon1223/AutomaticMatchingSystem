@@ -20,7 +20,6 @@ import {
   rematchRound1,
   reportMatchResult,
   getStandings,
-  checkRoundCompleted,
   createNextRound,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
@@ -155,7 +154,7 @@ export default function TournamentDetailPage() {
 
   // 対戦表画面で定期的にデータを更新（5秒ごと）
   useEffect(() => {
-    if (id && activeTab === 'tournament' && tournament?.status === 'IN_PROGRESS') {
+    if (id && activeTab === 'tournament' && tournament?.status === 'in_progress') {
       const interval = setInterval(() => {
         loadMatches(selectedRound)
         loadStandings()
@@ -1248,7 +1247,7 @@ export default function TournamentDetailPage() {
 
           {/* マッチング作成（管理者または主催者のみ、受付終了時間以降） */}
           {/* デバッグ用: 条件の状態を確認 */}
-          {process.env.NODE_ENV === 'development' && canEditTournament && tournament.status === 'registration' && (
+          {import.meta.env.DEV && canEditTournament && tournament.status === 'registration' && (
             <div style={{ padding: '10px', backgroundColor: '#f0f0f0', marginBottom: '10px', fontSize: '12px' }}>
               <div>canEditTournament: {canEditTournament ? 'true' : 'false'}</div>
               <div>tournament.status: {tournament.status}</div>
@@ -1257,7 +1256,7 @@ export default function TournamentDetailPage() {
               <div>現在時刻: {getJSTNow().toISOString()}</div>
             </div>
           )}
-          {canEditTournament && (tournament.status === 'registration' || tournament.status === 'draft' || tournament.status === 'preparing') && isAfterRegistrationEnd() && (
+          {canEditTournament && (tournament.status === 'registration' || tournament.status === 'draft' || (tournament.status as string) === 'preparing') && isAfterRegistrationEnd() && (
             <div
               style={{
                 marginBottom: '30px',
@@ -1545,8 +1544,8 @@ export default function TournamentDetailPage() {
                 
                 // 同じミリ秒の場合（本番運用で同じ時刻にエントリーされた場合）は、createdAtでソート
                 // より早くデータベースに保存された方が先（先着順）
-                const createdA = a.createdAt ? parseJSTISOString(a.createdAt).getTime() : 0
-                const createdB = b.createdAt ? parseJSTISOString(b.createdAt).getTime() : 0
+                const createdA = (a as any).createdAt ? parseJSTISOString((a as any).createdAt).getTime() : 0
+                const createdB = (b as any).createdAt ? parseJSTISOString((b as any).createdAt).getTime() : 0
                 if (createdA !== createdB) {
                   return createdA - createdB
                 }
@@ -1595,7 +1594,7 @@ export default function TournamentDetailPage() {
                       // データベースから返されるISO文字列（UTC）をローカル時刻（JST）に変換
                       const date = new Date(participant.enteredAt)
                       // デバッグ用
-                      if (process.env.NODE_ENV === 'development') {
+                      if (import.meta.env.DEV) {
                         console.log('enteredAt display:', {
                           original: participant.enteredAt,
                           parsed: date.toISOString(),
@@ -1887,11 +1886,10 @@ export default function TournamentDetailPage() {
                               
                               if (!myMatch) return null
 
-                              const canTap = true // 自分の対戦なので常にタップ可能
                               const player1Win = myMatch.result === 'player1'
                               const player2Win = myMatch.result === 'player2'
                               const isDraw = myMatch.result === 'draw'
-                              const isBothLoss = myMatch.result === 'both_loss'
+                              const isBothLoss = (myMatch.result as string) === 'both_loss'
 
                               return (
                                 <div style={{ marginBottom: '30px' }}>
@@ -2439,8 +2437,6 @@ export default function TournamentDetailPage() {
               {(() => {
                 // 自分の対戦かどうかを判定
                 const isMyMatch = selectedMatch.player1.user.id === user?.id || selectedMatch.player2.user.id === user?.id
-                const isPlayer1 = selectedMatch.player1.user.id === user?.id
-                const isPlayer2 = selectedMatch.player2.user.id === user?.id
                 const hasResult = !!selectedMatch.result
                 
                 // 参加者の場合、結果が登録されている場合はボタンを非表示にして結果を表示
