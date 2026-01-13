@@ -1446,7 +1446,7 @@ router.post('/:id/next-round', authenticate, requireRole('organizer', 'admin'), 
 
     res.json({
       round: nextRound,
-      matches: matches.map(transformMatch),
+      matches: matches.map(m => transformMatch(m)),
     })
   } catch (error: any) {
     console.error('Create next round error:', error)
@@ -1463,7 +1463,7 @@ router.post('/:id/rounds/:round/pairings', authenticate, requireRole('organizer'
   try {
     const round = parseInt(req.params.round)
     const matches = await generatePairings(req.params.id, round)
-    res.json(matches.map(transformMatch))
+    res.json(matches.map(m => transformMatch(m)))
   } catch (error: any) {
     console.error('Generate pairings error:', error)
     res.status(500).json({ message: error.message || 'マッチングの生成に失敗しました' })
@@ -1598,7 +1598,7 @@ router.post('/:id/rematch-round1', authenticate, requireRole('organizer', 'admin
 
     // 再マッチング
     const matches = await generatePairings(req.params.id, 1)
-    res.json(matches.map(transformMatch))
+    res.json(matches.map(m => transformMatch(m)))
   } catch (error: any) {
     console.error('Rematch round 1 error:', error)
     res.status(500).json({ message: error.message || '対戦表の再作成に失敗しました' })
@@ -1620,7 +1620,7 @@ router.post('/:id/rounds/:round/rematch', authenticate, requireRole('organizer',
 
     // 再マッチング
     const matches = await generatePairings(req.params.id, round)
-    res.json(matches.map(transformMatch))
+    res.json(matches.map(m => transformMatch(m)))
   } catch (error: any) {
     console.error('Rematch error:', error)
     res.status(500).json({ message: error.message || '再マッチングに失敗しました' })
