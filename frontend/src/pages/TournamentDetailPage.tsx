@@ -2353,21 +2353,26 @@ export default function TournamentDetailPage() {
                                         <div style={{ 
                                           flex: 1,
                                           fontSize: isMobile ? '11px' : '12px',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap',
                                           minWidth: 0,
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '2px',
                                         }}>
-                                          {match.player2.user.name}
+                                          <div style={{
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                          }}>
+                                            {match.player2.user.name}
+                                          </div>
                                           {match.player2.pointsBeforeRound !== undefined && (
-                                            <span style={{
-                                              marginLeft: '6px',
-                                              fontSize: isMobile ? '10px' : '11px',
+                                            <div style={{
+                                              fontSize: isMobile ? '9px' : '10px',
                                               color: isDark ? '#aaa' : '#666',
                                               fontWeight: 'normal',
                                             }}>
-                                              ({match.player2.pointsBeforeRound}点)
-                                            </span>
+                                              {match.player2.pointsBeforeRound}点
+                                            </div>
                                           )}
                                         </div>
                                         
