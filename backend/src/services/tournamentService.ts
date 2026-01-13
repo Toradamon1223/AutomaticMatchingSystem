@@ -405,6 +405,71 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     }
   }
 
+  // 全参加者がマッチに含まれているか確認
+  const allParticipantIds = new Set(participants.map(p => p.id))
+  const matchedParticipantIds = new Set(used)
+  const unmatchedParticipants = Array.from(allParticipantIds).filter(id => !matchedParticipantIds.has(id))
+  
+  console.log(`[generatePairings] Round ${round}: Total participants: ${allParticipantIds.size}, Matched: ${matchedParticipantIds.size}, Unmatched: ${unmatchedParticipants.length}`)
+  
+  if (unmatchedParticipants.length > 0) {
+    console.error(`[generatePairings] Round ${round}: ${unmatchedParticipants.length} participants were not matched:`, unmatchedParticipants.slice(0, 10))
+    // マッチされていない参加者をBYEとして処理
+    for (const participantId of unmatchedParticipants) {
+      const participant = participants.find(p => p.id === participantId)
+      if (!participant) continue
+      
+      const byeMatch = await prisma.match.create({
+        data: {
+          tournamentId,
+          round,
+          matchNumber: matchNumber++,
+          player1Id: participant.id,
+          player2Id: participant.id,
+          tableNumber: tableNumber++,
+          isTournamentMatch: false,
+          result: 'PLAYER1',
+          reportedBy: null,
+          reportedAt: new Date(),
+        },
+        include: {
+          player1: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          player2: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      
+      matches.push(byeMatch)
+      
+      await prisma.participant.update({
+        where: { id: participant.id },
+        data: {
+          wins: { increment: 1 },
+          points: { increment: 3 },
+        },
+      })
+    }
+  }
+
+  console.log(`[generatePairings] Round ${round}: Created ${matches.length} matches for ${used.size + unmatchedParticipants.length} participants`)
+
   // 現在の回戦数を更新
   await prisma.tournament.update({
     where: { id: tournamentId },
