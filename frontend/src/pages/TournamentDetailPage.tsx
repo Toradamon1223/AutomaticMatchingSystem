@@ -372,7 +372,7 @@ export default function TournamentDetailPage() {
       }
       loadBracket()
     }
-  }, [id, activeTab, selectedRound, tournament, user, checkPreliminaryStatus])
+  }, [id, activeTab, selectedRound])
 
   // 対戦表画面で定期的にデータを更新（5秒ごと）
   useEffect(() => {
@@ -2157,6 +2157,7 @@ export default function TournamentDetailPage() {
                     const round6Total = round6Matches.length
                     const round6IsCompleted = round6Total > 0 && round6Completed === round6Total
                     const round6IsActiveRound = tournament.currentRound === 6
+                    const round6IsPastRound = 6 < (tournament.currentRound || 0)
                     return round6Matches.length > 0 && (
                       <div style={{
                         padding: '10px',
@@ -2172,7 +2173,10 @@ export default function TournamentDetailPage() {
                         <div>round6Total: {round6Total}</div>
                         <div>round6IsCompleted: {round6IsCompleted ? 'true' : 'false'}</div>
                         <div>round6IsActiveRound: {round6IsActiveRound ? 'true' : 'false'}</div>
+                        <div>round6IsPastRound: {round6IsPastRound ? 'true' : 'false'}</div>
                         <div>tournament.currentRound: {tournament.currentRound}</div>
+                        <div>matches.length (全体): {matches.length}</div>
+                        <div>matches.filter(round=6).length: {matches.filter(m => m.round === 6).length}</div>
                         <div style={{ marginTop: '5px', fontSize: '11px', opacity: 0.8 }}>
                           resultなしのマッチ: {round6Matches.filter(m => !m.result).map(m => m.id).join(', ') || 'なし'}
                         </div>
@@ -2225,7 +2229,8 @@ export default function TournamentDetailPage() {
                             
                             // デバッグログ（6回戦の場合のみ）
                             if (round === 6) {
-                              console.log(`[6回戦完了判定] roundMatches: ${roundMatches.length}, roundCompleted: ${roundCompleted}, roundTotal: ${roundTotal}, isRoundCompleted: ${isRoundCompleted}`)
+                              console.log(`[6回戦完了判定] matches.length: ${matches.length}, roundMatches: ${roundMatches.length}, roundCompleted: ${roundCompleted}, roundTotal: ${roundTotal}, isRoundCompleted: ${isRoundCompleted}`)
+                              console.log(`[6回戦完了判定] isActiveRound: ${isActiveRound}, isPastRound: ${isPastRound}`)
                               console.log(`[6回戦完了判定] matches詳細:`, roundMatches.map(m => ({ id: m.id, result: m.result, isTournamentMatch: m.isTournamentMatch })))
                               console.log(`[6回戦完了判定] resultなしのマッチ:`, roundMatches.filter(m => !m.result).map(m => ({ id: m.id, result: m.result })))
                             }
