@@ -2033,6 +2033,18 @@ export default function TournamentDetailPage() {
                 </div>
               )}
 
+              {/* デバッグ情報（開発環境のみ） */}
+              {import.meta.env.DEV && (
+                <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
+                  <div><strong>予選順位表発表ボタンの表示条件:</strong></div>
+                  <div>canEditTournament: {String(canEditTournament)}</div>
+                  <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
+                  <div style={{ marginTop: '5px', fontWeight: 'bold', color: (canEditTournament && isPreliminaryCompleted) ? 'green' : 'red' }}>
+                    ボタン表示: {String(canEditTournament && isPreliminaryCompleted)}
+                  </div>
+                </div>
+              )}
+
               {/* 予選順位表発表ボタン（管理者/開催者のみ、予選完了時） */}
               {canEditTournament && isPreliminaryCompleted && (
                 <div style={{ marginBottom: '20px', textAlign: 'center' }}>
@@ -2852,11 +2864,22 @@ export default function TournamentDetailPage() {
           {/* デバッグ情報（開発環境のみ） */}
           {import.meta.env.DEV && (
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
+              <div><strong>決勝トーナメント作成ボタンの表示条件:</strong></div>
               <div>canEditTournament: {String(canEditTournament)}</div>
-              <div>tournament.status: {tournament.status}</div>
-              <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
-              <div>tournamentBracket: {tournamentBracket ? 'exists' : 'null'}</div>
+              <div>tournament.status: {tournament.status} (必要: 'in_progress')</div>
+              <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)} (必要: true)</div>
+              <div>tournamentBracket: {tournamentBracket ? 'exists' : 'null'} (必要: null)</div>
               <div>tournament.currentRound: {tournament.currentRound}</div>
+              <div>tournament.preliminaryRounds: {String(tournament.preliminaryRounds)}</div>
+              <div style={{ marginTop: '10px', padding: '5px', backgroundColor: isDark ? '#444' : '#e0e0e0', borderRadius: '3px' }}>
+                <strong>表示条件チェック:</strong>
+                <div>canEditTournament && status === 'in_progress': {String(canEditTournament && tournament.status === 'in_progress')}</div>
+                <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
+                <div>!tournamentBracket: {String(!tournamentBracket)}</div>
+                <div style={{ marginTop: '5px', fontWeight: 'bold', color: (canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket) ? 'green' : 'red' }}>
+                  ボタン表示: {String(canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket)}
+                </div>
+              </div>
             </div>
           )}
           
