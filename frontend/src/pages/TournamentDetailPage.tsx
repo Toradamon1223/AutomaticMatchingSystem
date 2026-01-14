@@ -94,6 +94,7 @@ export default function TournamentDetailPage() {
   const [tournamentViewTab, setTournamentViewTab] = useState<'matches' | 'ranking'>('matches')
   const [selectedRound, setSelectedRound] = useState<number>(1)
   const [isMobile, setIsMobile] = useState(false)
+  const [lastNotifiedRound, setLastNotifiedRound] = useState<number>(0)
 
   // モバイル判定
   useEffect(() => {
@@ -144,6 +145,11 @@ export default function TournamentDetailPage() {
       loadEntryStatus()
       loadAnnouncement()
     }
+    
+    // 通知の許可をリクエスト
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
   }, [id])
 
   // タブ変更時にデータを読み込む
@@ -165,6 +171,52 @@ export default function TournamentDetailPage() {
       return () => clearInterval(interval)
     }
   }, [id, activeTab, selectedRound, tournament?.status])
+
+  // 新しい回戦が開始されたら通知を送る（10秒ごとにチェック）
+  useEffect(() => {
+    if (!id || tournament?.status !== 'in_progress') return
+
+    const checkNewRound = async () => {
+      try {
+        const data = await getTournament(id)
+        const currentRound = data.currentRound || 0
+        
+        // 新しい回戦が開始された場合
+        if (currentRound > lastNotifiedRound && lastNotifiedRound > 0) {
+          // 通知を送る
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            const notification = new Notification(`第${currentRound}回戦が開始されました`, {
+              body: `${tournament.name}の第${currentRound}回戦の対戦表が発表されました。`,
+              icon: '/favicon.ico',
+              tag: `tournament-${id}-round-${currentRound}`,
+            })
+            
+            notification.onclick = () => {
+              window.focus()
+              setActiveTab('tournament')
+              setSelectedRound(currentRound)
+              notification.close()
+            }
+          }
+          
+          setLastNotifiedRound(currentRound)
+          setTournament(data)
+          if (currentRound > 0) {
+            setSelectedRound(currentRound)
+          }
+        } else if (currentRound > lastNotifiedRound) {
+          // 初回は通知しない（lastNotifiedRoundが0の場合）
+          setLastNotifiedRound(currentRound)
+        }
+      } catch (error) {
+        console.error('新しい回戦の確認に失敗しました', error)
+      }
+    }
+
+    const interval = setInterval(checkNewRound, 10000) // 10秒ごとにチェック
+
+    return () => clearInterval(interval)
+  }, [id, tournament?.status, tournament?.name, lastNotifiedRound])
 
   // モバイル判定
   useEffect(() => {
