@@ -358,6 +358,17 @@ export default function TournamentDetailPage() {
       if (canEdit) {
         checkPreliminaryStatus()
       }
+      // トーナメントタブでも決勝トーナメントデータを読み込む（ボタン表示用）
+      const loadBracket = async () => {
+        try {
+          const bracket = await getTournamentBracket(id)
+          setTournamentBracket(bracket)
+        } catch (error) {
+          console.error('Failed to load tournament bracket:', error)
+          setTournamentBracket(null)
+        }
+      }
+      loadBracket()
     } else if (activeTab === 'finalTournament') {
       // 予選完了判定をチェック（常にチェック）
       checkPreliminaryStatus()
@@ -372,18 +383,6 @@ export default function TournamentDetailPage() {
           setTournamentBracket(null)
         } finally {
           setLoadingBracket(false)
-        }
-      }
-      loadBracket()
-    } else if (activeTab === 'tournament') {
-      // トーナメントタブでも決勝トーナメントデータを読み込む（ボタン表示用）
-      const loadBracket = async () => {
-        try {
-          const bracket = await getTournamentBracket(id)
-          setTournamentBracket(bracket)
-        } catch (error) {
-          console.error('Failed to load tournament bracket:', error)
-          setTournamentBracket(null)
         }
       }
       loadBracket()
