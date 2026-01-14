@@ -619,7 +619,7 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
         .filter((m) => m.player1Id !== m.player2Id) // バイの試合を除外
         .map((m) => ({
           opponent: m.player1,
-          result: m.result === 'PLAYER1' ? 'PLAYER2' : m.result === 'PLAYER2' ? 'PLAYER1' : 'DRAW',
+          result: m.result === 'PLAYER1' ? 'PLAYER2' : m.result === 'PLAYER2' ? 'PLAYER1' : m.result === 'BOTH_LOSS' ? 'BOTH_LOSS' : 'DRAW',
         })),
     ]
     
@@ -643,8 +643,10 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       } else if (result === 'DRAW') {
         draws++
         points += 1
+      } else if (result === 'BOTH_LOSS') {
+        losses++
+        // 両者敗北は勝ち点0点（加算しない）
       }
-      // BOTH_LOSSの場合は何も加算しない
     }
     
     // バイの試合をカウント（バイを受けたプレイヤーは自動的に勝利）
