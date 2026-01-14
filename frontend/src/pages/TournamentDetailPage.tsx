@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Tournament, Participant, Match } from '../types'
 import {
@@ -309,6 +309,34 @@ export default function TournamentDetailPage() {
     }
   }, [id])
 
+  // 予選完了判定をチェック
+  const checkPreliminaryStatus = useCallback(async () => {
+    if (!id || checkingPreliminaryCompleted) return
+    setCheckingPreliminaryCompleted(true)
+    try {
+      const result = await checkPreliminaryCompleted(id)
+      setIsPreliminaryCompleted(result.isCompleted)
+    } catch (error) {
+      console.error('予選完了判定の確認に失敗しました', error)
+    } finally {
+      setCheckingPreliminaryCompleted(false)
+    }
+  }, [id, checkingPreliminaryCompleted])
+
+  // トーナメント読み込み後、管理者/開催者の場合に予選完了判定をチェック
+  useEffect(() => {
+    if (!id || !tournament) return
+    
+    const isOrganizer = (user?.role === 'organizer' || user?.role === 'admin') && tournament.organizerId === user?.id
+    const isAdmin = user?.role === 'admin'
+    const canEdit = isOrganizer || isAdmin
+    
+    // 管理者/開催者で、大会が進行中の場合に予選完了判定をチェック
+    if (canEdit && tournament.status === 'in_progress') {
+      checkPreliminaryStatus()
+    }
+  }, [id, tournament, user, checkPreliminaryStatus])
+
   // タブ変更時にデータを読み込む
   useEffect(() => {
     if (!id || !tournament) return
@@ -342,21 +370,7 @@ export default function TournamentDetailPage() {
       }
       loadBracket()
     }
-  }, [id, activeTab, selectedRound, tournament, user])
-
-  // 予選完了判定をチェック
-  const checkPreliminaryStatus = async () => {
-    if (!id || checkingPreliminaryCompleted) return
-    setCheckingPreliminaryCompleted(true)
-    try {
-      const result = await checkPreliminaryCompleted(id)
-      setIsPreliminaryCompleted(result.isCompleted)
-    } catch (error) {
-      console.error('予選完了判定の確認に失敗しました', error)
-    } finally {
-      setCheckingPreliminaryCompleted(false)
-    }
-  }
+  }, [id, activeTab, selectedRound, tournament, user, checkPreliminaryStatus])
 
   // 対戦表画面で定期的にデータを更新（5秒ごと）
   useEffect(() => {
