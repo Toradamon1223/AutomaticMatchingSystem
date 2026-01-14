@@ -311,14 +311,24 @@ export default function TournamentDetailPage() {
 
   // タブ変更時にデータを読み込む
   useEffect(() => {
-    if (id && activeTab === 'tournament') {
+    if (!id || !tournament) return
+    
+    const isOrganizer = (user?.role === 'organizer' || user?.role === 'admin') && tournament.organizerId === user?.id
+    const isAdmin = user?.role === 'admin'
+    const canEdit = isOrganizer || isAdmin
+    
+    if (activeTab === 'tournament') {
       loadMatches(selectedRound)
       loadStandings()
       // 予選完了判定をチェック（管理者/開催者のみ）
-      if (canEditTournament) {
+      if (canEdit) {
         checkPreliminaryStatus()
       }
-    } else if (id && activeTab === 'finalTournament') {
+    } else if (activeTab === 'finalTournament') {
+      // 予選完了判定をチェック（管理者/開催者のみ）
+      if (canEdit) {
+        checkPreliminaryStatus()
+      }
       // 決勝トーナメントデータを読み込む
       const loadBracket = async () => {
         try {
@@ -334,7 +344,7 @@ export default function TournamentDetailPage() {
       }
       loadBracket()
     }
-  }, [id, activeTab, selectedRound])
+  }, [id, activeTab, selectedRound, tournament, user])
 
   // 予選完了判定をチェック
   const checkPreliminaryStatus = async () => {
