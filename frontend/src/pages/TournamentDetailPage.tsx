@@ -325,10 +325,8 @@ export default function TournamentDetailPage() {
         checkPreliminaryStatus()
       }
     } else if (activeTab === 'finalTournament') {
-      // 予選完了判定をチェック（管理者/開催者のみ）
-      if (canEdit) {
-        checkPreliminaryStatus()
-      }
+      // 予選完了判定をチェック（常にチェック）
+      checkPreliminaryStatus()
       // 決勝トーナメントデータを読み込む
       const loadBracket = async () => {
         try {
@@ -2023,6 +2021,8 @@ export default function TournamentDetailPage() {
                         await announcePreliminaryStandings(id)
                         alert('予選順位表を発表しました')
                         await loadTournament()
+                        // 予選順位発表後は必ず完了状態になる
+                        setIsPreliminaryCompleted(true)
                         await checkPreliminaryStatus()
                       } catch (error: any) {
                         console.error('Announce preliminary standings error:', error)
