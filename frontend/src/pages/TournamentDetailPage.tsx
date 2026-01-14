@@ -77,7 +77,7 @@ function getTimeRemaining(targetDate: Date): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-type TabType = 'details' | 'participants' | 'tournament' | 'finalTournament' | 'announcement'
+type TabType = 'details' | 'participants' | 'tournament' | 'announcement'
 
 // 決勝トーナメントブラケット表示コンポーネント
 interface TournamentBracketDisplayProps {
@@ -102,130 +102,267 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
     await onWinnerSelect(match.id, playerId)
   }
 
+  // 各ラウンドの最大マッチ数を計算（接続線の位置計算用）
+  const maxMatchesPerRound = Math.max(...bracket.rounds.map(r => r.matches.length), 1)
+  const matchHeight = 80 // 各マッチの高さ
+  const matchGap = 20 // マッチ間の間隔
+  const roundGap = 60 // ラウンド間の間隔
+  const titleHeight = 40 // タイトル部分の高さ
+
   return (
     <div style={{
+      position: 'relative',
       display: 'flex',
       flexDirection: 'row',
-      gap: '40px',
+      gap: `${roundGap}px`,
       overflowX: 'auto',
-      padding: '20px 0',
+      padding: '40px 20px',
       alignItems: 'flex-start',
+      backgroundImage: 'radial-gradient(circle, #e0e0e0 1px, transparent 1px)',
+      backgroundSize: '20px 20px',
+      backgroundColor: isDark ? '#1a1a1a' : '#fff',
+      minHeight: `${titleHeight + maxMatchesPerRound * (matchHeight + matchGap)}px`,
     }}>
-      {bracket.rounds.map((roundData) => (
-        <div key={roundData.round} style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px',
-          minWidth: '250px',
-        }}>
-          <h3 style={{
-            color: isDark ? '#fff' : '#333',
-            marginBottom: '10px',
-            fontSize: '18px',
-            fontWeight: 'bold',
-            textAlign: 'center',
-          }}>
-            第{roundData.round}回戦
-          </h3>
-          <div style={{
+      {bracket.rounds.map((roundData, roundIndex) => {
+        const isLastRound = roundIndex === bracket.rounds.length - 1
+        
+        return (
+          <div key={roundData.round} style={{
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: `${matchGap}px`,
+            minWidth: '200px',
           }}>
-            {roundData.matches.map((match) => {
-              const isPlayer1 = match.player1.userId === user?.id
-              const isPlayer2 = match.player2.userId === user?.id
-              const isMyMatch = isPlayer1 || isPlayer2
-              const isBye = match.player1Id === match.player2Id
-              const winnerId = match.result === 'player1' ? match.player1Id : match.result === 'player2' ? match.player2Id : null
+            <h3 style={{
+              color: isDark ? '#fff' : '#333',
+              marginBottom: '10px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center',
+            }}>
+              第{roundData.round}回戦
+            </h3>
+            
+            {/* 接続線（次のラウンドへの線） */}
+            {!isLastRound && (() => {
+              const nextRoundMatches = bracket.rounds[roundIndex + 1].matches
+              const svgHeight = roundData.matches.length * (matchHeight + matchGap)
               
               return (
-                <div
-                  key={match.id}
+                <svg
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '20px',
-                    padding: '12px',
-                    backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5',
-                    borderRadius: '8px',
-                    border: isMyMatch ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
+                    position: 'absolute',
+                    left: '100%',
+                    top: `${titleHeight}px`,
+                    width: `${roundGap}px`,
+                    height: `${svgHeight}px`,
+                    pointerEvents: 'none',
+                    zIndex: 0,
                   }}
                 >
-                  {/* Player 1 */}
+                {roundData.matches.map((match, matchIndex) => {
+                  const currentY = matchIndex * (matchHeight + matchGap) + matchHeight / 2
+                  
+                  return (
+                    <g key={match.id}>
+                      {/* 水平線（現在のラウンドから） */}
+                      <line
+                        x1="0"
+                        y1={currentY}
+                        x2={roundGap / 2}
+                        y2={currentY}
+                        stroke={isDark ? '#666' : '#333'}
+                        strokeWidth="2"
+                      />
+                    </g>
+                  )
+                })}
+                  {/* 垂直線と次のラウンドへの水平線（ペアごとに描画） */}
+                  {nextRoundMatches.map((_, nextMatchIndex) => {
+                    const pairStartIndex = nextMatchIndex * 2
+                    const pairEndIndex = pairStartIndex + 1
+                    const hasPairEnd = pairEndIndex < roundData.matches.length
+                    
+                    if (!hasPairEnd) return null
+                    
+                    const startY = pairStartIndex * (matchHeight + matchGap) + matchHeight / 2
+                    const endY = pairEndIndex * (matchHeight + matchGap) + matchHeight / 2
+                    const nextY = nextMatchIndex * (matchHeight + matchGap) + matchHeight / 2
+                    const centerY = (startY + endY) / 2
+                    
+                    return (
+                      <g key={`connector-${nextMatchIndex}`}>
+                        {/* 垂直線（2つのマッチを結合） */}
+                        <line
+                          x1={roundGap / 2}
+                          y1={startY}
+                          x2={roundGap / 2}
+                          y2={endY}
+                          stroke={isDark ? '#666' : '#333'}
+                          strokeWidth="2"
+                        />
+                        {/* 水平線（次のラウンドへ） */}
+                        <line
+                          x1={roundGap / 2}
+                          y1={nextY}
+                          x2={roundGap}
+                          y2={nextY}
+                          stroke={isDark ? '#666' : '#333'}
+                          strokeWidth="2"
+                        />
+                        {/* 中央の垂直線（結合点から次のラウンドへ） */}
+                        <line
+                          x1={roundGap / 2}
+                          y1={centerY}
+                          x2={roundGap / 2}
+                          y2={nextY}
+                          stroke={isDark ? '#666' : '#333'}
+                          strokeWidth="2"
+                        />
+                      </g>
+                    )
+                  })}
+                </svg>
+              )
+            })()}
+            
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: `${matchGap}px`,
+              position: 'relative',
+              zIndex: 1,
+            }}>
+              {roundData.matches.map((match, matchIndex) => {
+                const isPlayer1 = match.player1.userId === user?.id
+                const isPlayer2 = match.player2.userId === user?.id
+                const isMyMatch = isPlayer1 || isPlayer2
+                const isBye = match.player1Id === match.player2Id
+                const winnerId = match.result === 'player1' ? match.player1Id : match.result === 'player2' ? match.player2Id : null
+                
+                return (
                   <div
-                    onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player1Id)}
+                    key={match.id}
                     style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      backgroundColor: isDark ? '#1a1a1a' : '#fff',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      width: '180px',
+                      minHeight: `${matchHeight}px`,
+                      padding: '10px',
+                      backgroundColor: isDark ? '#2a5a7a' : '#b3d9ff',
                       borderRadius: '6px',
-                      cursor: isMyMatch && !match.result ? 'pointer' : 'default',
-                      border: winnerId === match.player1Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
-                      fontWeight: winnerId === match.player1Id ? 'bold' : 'normal',
-                      color: isDark ? '#fff' : '#333',
-                      transition: 'all 0.2s',
-                      opacity: match.result && winnerId !== match.player1Id ? 0.5 : 1,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (isMyMatch && !match.result) {
-                        e.currentTarget.style.backgroundColor = isDark ? '#333' : '#e0e0e0'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (isMyMatch && !match.result) {
-                        e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#fff'
-                      }
+                      border: isMyMatch ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `2px solid ${isDark ? '#4a6a8a' : '#80c0ff'}`,
+                      boxShadow: isMyMatch ? `0 0 8px ${isDark ? '#4CAF50' : '#2196F3'}` : 'none',
                     }}
                   >
-                    {match.player1.user.name}
-                  </div>
-                  
-                  {/* VS */}
-                  <div style={{
-                    fontSize: '14px',
-                    color: isDark ? '#aaa' : '#666',
-                    fontWeight: 'bold',
-                  }}>
-                    {isBye ? 'BYE' : 'VS'}
-                  </div>
-                  
-                  {/* Player 2 */}
-                  {!isBye && (
+                    {/* Player 1 */}
                     <div
-                      onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player2Id)}
+                      onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player1Id)}
                       style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        backgroundColor: isDark ? '#1a1a1a' : '#fff',
-                        borderRadius: '6px',
+                        padding: '8px',
+                        marginBottom: '4px',
+                        backgroundColor: winnerId === match.player1Id 
+                          ? (isDark ? '#4CAF50' : '#90EE90')
+                          : (isDark ? '#1a3a5a' : '#fff'),
+                        borderRadius: '4px',
                         cursor: isMyMatch && !match.result ? 'pointer' : 'default',
-                        border: winnerId === match.player2Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
-                        fontWeight: winnerId === match.player2Id ? 'bold' : 'normal',
-                        color: isDark ? '#fff' : '#333',
+                        border: winnerId === match.player1Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#4a6a8a' : '#80c0ff'}`,
+                        fontWeight: winnerId === match.player1Id ? 'bold' : 'normal',
+                        color: winnerId === match.player1Id 
+                          ? (isDark ? '#fff' : '#000')
+                          : (isDark ? '#fff' : '#333'),
                         transition: 'all 0.2s',
-                        opacity: match.result && winnerId !== match.player2Id ? 0.5 : 1,
+                        opacity: match.result && winnerId !== match.player1Id ? 0.5 : 1,
+                        textAlign: 'center',
+                        fontSize: '13px',
                       }}
                       onMouseEnter={(e) => {
                         if (isMyMatch && !match.result) {
-                          e.currentTarget.style.backgroundColor = isDark ? '#333' : '#e0e0e0'
+                          e.currentTarget.style.backgroundColor = isDark ? '#3a4a6a' : '#e0f0ff'
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (isMyMatch && !match.result) {
-                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#fff'
+                          e.currentTarget.style.backgroundColor = winnerId === match.player1Id 
+                            ? (isDark ? '#4CAF50' : '#90EE90')
+                            : (isDark ? '#1a3a5a' : '#fff')
                         }
                       }}
                     >
-                      {match.player2.user.name}
+                      {match.player1.user.name}
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                    
+                    {/* VS or BYE */}
+                    {!isBye && (
+                      <div style={{
+                        fontSize: '11px',
+                        color: isDark ? '#aaa' : '#666',
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                        margin: '2px 0',
+                      }}>
+                        VS
+                      </div>
+                    )}
+                    
+                    {/* Player 2 */}
+                    {!isBye ? (
+                      <div
+                        onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player2Id)}
+                        style={{
+                          padding: '8px',
+                          backgroundColor: winnerId === match.player2Id 
+                            ? (isDark ? '#4CAF50' : '#90EE90')
+                            : (isDark ? '#1a3a5a' : '#fff'),
+                          borderRadius: '4px',
+                          cursor: isMyMatch && !match.result ? 'pointer' : 'default',
+                          border: winnerId === match.player2Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#4a6a8a' : '#80c0ff'}`,
+                          fontWeight: winnerId === match.player2Id ? 'bold' : 'normal',
+                          color: winnerId === match.player2Id 
+                            ? (isDark ? '#fff' : '#000')
+                            : (isDark ? '#fff' : '#333'),
+                          transition: 'all 0.2s',
+                          opacity: match.result && winnerId !== match.player2Id ? 0.5 : 1,
+                          textAlign: 'center',
+                          fontSize: '13px',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (isMyMatch && !match.result) {
+                            e.currentTarget.style.backgroundColor = isDark ? '#3a4a6a' : '#e0f0ff'
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (isMyMatch && !match.result) {
+                            e.currentTarget.style.backgroundColor = winnerId === match.player2Id 
+                              ? (isDark ? '#4CAF50' : '#90EE90')
+                              : (isDark ? '#1a3a5a' : '#fff')
+                          }
+                        }}
+                      >
+                        {match.player2.user.name}
+                      </div>
+                    ) : (
+                      <div style={{
+                        padding: '8px',
+                        backgroundColor: isDark ? '#1a3a5a' : '#fff',
+                        borderRadius: '4px',
+                        textAlign: 'center',
+                        fontSize: '13px',
+                        color: isDark ? '#aaa' : '#666',
+                        fontStyle: 'italic',
+                      }}>
+                        BYE
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -366,23 +503,6 @@ export default function TournamentDetailPage() {
         } catch (error) {
           console.error('Failed to load tournament bracket:', error)
           setTournamentBracket(null)
-        }
-      }
-      loadBracket()
-    } else if (activeTab === 'finalTournament') {
-      // 予選完了判定をチェック（常にチェック）
-      checkPreliminaryStatus()
-      // 決勝トーナメントデータを読み込む
-      const loadBracket = async () => {
-        try {
-          setLoadingBracket(true)
-          const bracket = await getTournamentBracket(id)
-          setTournamentBracket(bracket)
-        } catch (error) {
-          console.error('Failed to load tournament bracket:', error)
-          setTournamentBracket(null)
-        } finally {
-          setLoadingBracket(false)
         }
       }
       loadBracket()
@@ -1032,7 +1152,6 @@ export default function TournamentDetailPage() {
           { id: 'details' as TabType, label: 'イベント詳細' },
           { id: 'participants' as TabType, label: '参加者' },
           { id: 'tournament' as TabType, label: 'トーナメント' },
-          { id: 'finalTournament' as TabType, label: '決勝トーナメント' },
           { id: 'announcement' as TabType, label: 'アナウンス' },
         ].map((tab) => (
           <button
@@ -2115,10 +2234,8 @@ export default function TournamentDetailPage() {
                         setTournamentBracket(null)
                         await loadTournament()
                         // トーナメントタブの場合は、決勝トーナメントデータを再読み込み
-                        if (activeTab === 'tournament') {
-                          const bracket = await getTournamentBracket(id)
-                          setTournamentBracket(bracket)
-                        }
+                        const bracket = await getTournamentBracket(id)
+                        setTournamentBracket(bracket)
                       } catch (error: any) {
                         console.error('Reset tournament bracket error:', error)
                         const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
@@ -2150,6 +2267,7 @@ export default function TournamentDetailPage() {
                           const bracket = await getTournamentBracket(id)
                           setTournamentBracket(bracket)
                           alert('決勝トーナメントを作成しました')
+                          // 決勝トーナメント作成後、自動で表示されるようにする
                         } catch (error: any) {
                           alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
                         } finally {
@@ -3002,145 +3120,49 @@ export default function TournamentDetailPage() {
               <p>マッチング発表後に表示されます</p>
             </div>
           )}
+
+          {/* 決勝トーナメント表示 */}
+          {tournamentBracket && tournamentBracket.rounds.length > 0 && (
+            <div style={{ marginTop: '40px', padding: '20px 0' }}>
+              <h3 style={{ 
+                color: isDark ? '#fff' : '#333', 
+                marginBottom: '20px',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                textAlign: 'center',
+              }}>
+                決勝トーナメント
+              </h3>
+              <TournamentBracketDisplay
+                bracket={tournamentBracket}
+                user={user}
+                isDark={isDark}
+                onWinnerSelect={async (matchId: string, winnerId: string) => {
+                  if (!id) return
+                  try {
+                    // 勝者を登録
+                    const match = tournamentBracket.matches.find(m => m.id === matchId)
+                    if (!match) return
+                    
+                    const result = match.player1Id === winnerId ? 'player1' : 'player2'
+                    await reportMatchResult(id, matchId, result)
+                    
+                    // ブラケットを再読み込み
+                    const updatedBracket = await getTournamentBracket(id)
+                    setTournamentBracket(updatedBracket)
+                    // マッチも再読み込み
+                    await loadMatches()
+                  } catch (error: any) {
+                    alert(error.response?.data?.message || '結果の登録に失敗しました')
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* アナウンスタブ */}
-      {/* 決勝トーナメントタブ */}
-      {activeTab === 'finalTournament' && (
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
-          <h2 style={{ color: isDark ? '#fff' : '#333', marginBottom: '20px' }}>決勝トーナメント</h2>
-          
-          {/* デバッグ情報 */}
-          {(
-            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
-              <div><strong>決勝トーナメント作成ボタンの表示条件:</strong></div>
-              <div>canEditTournament: {String(canEditTournament)}</div>
-              <div>tournament.status: {tournament.status} (必要: 'in_progress')</div>
-              <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)} (必要: true)</div>
-              <div>tournamentBracket: {tournamentBracket ? (tournamentBracket.rounds.length > 0 ? 'exists (rounds: ' + tournamentBracket.rounds.length + ')' : 'empty (rounds: 0)') : 'null'} (必要: null or empty)</div>
-              <div>tournament.currentRound: {tournament.currentRound}</div>
-              <div>tournament.preliminaryRounds: {String(tournament.preliminaryRounds)}</div>
-              <div style={{ marginTop: '10px', padding: '5px', backgroundColor: isDark ? '#444' : '#e0e0e0', borderRadius: '3px' }}>
-                <strong>表示条件チェック:</strong>
-                <div>canEditTournament && status === 'in_progress': {String(canEditTournament && tournament.status === 'in_progress')}</div>
-                <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
-                <div>!tournamentBracket || rounds.length === 0: {String(!tournamentBracket || (tournamentBracket && tournamentBracket.rounds.length === 0))}</div>
-                <div style={{ marginTop: '5px', fontWeight: 'bold', color: (canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0)) ? 'green' : 'red' }}>
-                  ボタン表示: {String(canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0))}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (
-            <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-              <button
-                onClick={async () => {
-                  if (!id) return
-                  if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
-                  try {
-                    await resetTournamentBracket(id)
-                    alert('決勝トーナメントをリセットしました')
-                    setTournamentBracket(null)
-                    await loadTournament()
-                    // 決勝トーナメントタブの場合は、決勝トーナメントデータを再読み込み
-                    if (activeTab === 'finalTournament') {
-                      const bracket = await getTournamentBracket(id)
-                      setTournamentBracket(bracket)
-                    }
-                  } catch (error: any) {
-                    console.error('Reset tournament bracket error:', error)
-                    const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
-                    alert(errorMessage)
-                  }
-                }}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '16px',
-                  marginRight: '10px',
-                }}
-              >
-                決勝トーナメントリセット
-              </button>
-              {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
-                <button
-                  onClick={async () => {
-                    if (!id) return
-                    if (!confirm('決勝トーナメントを作成しますか？')) return
-                    try {
-                      setLoadingBracket(true)
-                      await createTournamentBracket(id)
-                      const bracket = await getTournamentBracket(id)
-                      setTournamentBracket(bracket)
-                      alert('決勝トーナメントを作成しました')
-                    } catch (error: any) {
-                      alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
-                    } finally {
-                      setLoadingBracket(false)
-                    }
-                  }}
-                  disabled={loadingBracket}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: loadingBracket ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '16px',
-                  }}
-                >
-                  {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {tournamentBracket && tournamentBracket.rounds.length > 0 ? (
-            <TournamentBracketDisplay
-              bracket={tournamentBracket}
-              user={user}
-              isDark={isDark}
-              onWinnerSelect={async (matchId: string, winnerId: string) => {
-                if (!id) return
-                try {
-                  // 勝者を登録
-                  const match = tournamentBracket.matches.find(m => m.id === matchId)
-                  if (!match) return
-                  
-                  const result = match.player1Id === winnerId ? 'player1' : 'player2'
-                  await reportMatchResult(id, matchId, result)
-                  
-                  // ブラケットを再読み込み
-                  const updatedBracket = await getTournamentBracket(id)
-                  setTournamentBracket(updatedBracket)
-                } catch (error: any) {
-                  alert(error.response?.data?.message || '結果の登録に失敗しました')
-                }
-              }}
-            />
-          ) : (
-            <div style={{ 
-              padding: '40px', 
-              textAlign: 'center', 
-              color: isDark ? '#aaa' : '#666' 
-            }}>
-              {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted
-                ? '決勝トーナメントがまだ作成されていません。上記のボタンから作成してください。'
-                : '決勝トーナメントはまだ開始されていません。'}
-            </div>
-          )}
-        </div>
-      )}
-
       {activeTab === 'announcement' && (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div
