@@ -1,7 +1,7 @@
 import express from 'express'
 import { prisma } from '../lib/prisma'
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth'
-import { generatePairings, calculateStandings } from '../services/tournamentService'
+import { generatePairings, calculateStandings, generateTournamentBracket } from '../services/tournamentService'
 import { transformTournament, transformMatch } from '../utils/tournamentTransform'
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 import QRCode from 'qrcode'
@@ -2106,6 +2106,134 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
   } catch (error) {
     console.error('Check preliminary completed error:', error)
     res.status(500).json({ message: '予選完了判定に失敗しました' })
+  }
+})
+
+// 決勝トーナメント作成
+router.post('/:id/create-tournament-bracket', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が進行中ではありません' })
+    }
+
+    // 既に決勝トーナメントが作成されているかチェック
+    const maxRound = await prisma.match.findFirst({
+      where: { tournamentId: req.params.id },
+      orderBy: { round: 'desc' },
+      select: { round: true },
+    })
+
+    const startRound = (maxRound?.round || 0) + 1
+
+    const existingTournamentMatches = await prisma.match.findFirst({
+      where: {
+        tournamentId: req.params.id,
+        round: { gte: startRound },
+      },
+    })
+
+    if (existingTournamentMatches) {
+      return res.status(400).json({ message: '決勝トーナメントは既に作成されています' })
+    }
+
+    // 決勝トーナメントマッチを生成
+    const matches = await generateTournamentBracket(req.params.id)
+
+    res.json({ 
+      message: '決勝トーナメントを作成しました',
+      matches: matches.map(m => transformMatch(m)),
+    })
+  } catch (error) {
+    console.error('Create tournament bracket error:', error)
+    res.status(500).json({ message: '決勝トーナメントの作成に失敗しました' })
+  }
+})
+
+// 決勝トーナメントマッチ取得
+router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 予選の最大roundを取得
+    const maxRound = await prisma.match.findFirst({
+      where: { tournamentId: req.params.id },
+      orderBy: { round: 'desc' },
+      select: { round: true },
+    })
+
+    if (!maxRound) {
+      return res.json({ matches: [], rounds: [] })
+    }
+
+    // 決勝トーナメントのマッチを取得（予選の最終roundより後のround）
+    const tournamentMatches = await prisma.match.findMany({
+      where: {
+        tournamentId: req.params.id,
+        round: { gt: maxRound.round },
+      },
+      include: {
+        player1: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        player2: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { round: 'asc' },
+        { matchNumber: 'asc' },
+      ],
+    })
+
+    // ラウンドごとにグループ化
+    const roundsMap = new Map<number, any[]>()
+    for (const match of tournamentMatches) {
+      if (!roundsMap.has(match.round)) {
+        roundsMap.set(match.round, [])
+      }
+      roundsMap.get(match.round)!.push(transformMatch(match))
+    }
+
+    const rounds = Array.from(roundsMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([round, matches]) => ({ round, matches }))
+
+    res.json({ matches: tournamentMatches.map(m => transformMatch(m)), rounds })
+  } catch (error) {
+    console.error('Get tournament bracket error:', error)
+    res.status(500).json({ message: '決勝トーナメントの取得に失敗しました' })
   }
 })
 

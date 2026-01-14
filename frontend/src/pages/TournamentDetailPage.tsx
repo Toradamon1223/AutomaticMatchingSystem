@@ -25,6 +25,9 @@ import {
   resetTournament,
   checkPreliminaryCompleted,
   announcePreliminaryStandings,
+  createTournamentBracket,
+  getTournamentBracket,
+  TournamentBracket,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
 import { format } from 'date-fns'
@@ -73,7 +76,155 @@ function getTimeRemaining(targetDate: Date): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-type TabType = 'details' | 'participants' | 'tournament' | 'announcement'
+type TabType = 'details' | 'participants' | 'tournament' | 'finalTournament' | 'announcement'
+
+// 決勝トーナメントブラケット表示コンポーネント
+interface TournamentBracketDisplayProps {
+  bracket: TournamentBracket
+  user: any
+  isDark: boolean
+  onWinnerSelect: (matchId: string, winnerId: string) => Promise<void>
+}
+
+function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: TournamentBracketDisplayProps) {
+  const handlePlayerClick = async (match: Match, playerId: string) => {
+    // 既に結果が登録されている場合は何もしない
+    if (match.result) return
+    
+    // 自分のマッチでない場合は何もしない
+    if (match.player1.userId !== user?.id && match.player2.userId !== user?.id) return
+    
+    // 確認ダイアログ
+    const playerName = match.player1Id === playerId ? match.player1.user.name : match.player2.user.name
+    if (!confirm(`${playerName}の勝利を登録しますか？`)) return
+    
+    await onWinnerSelect(match.id, playerId)
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '40px',
+      overflowX: 'auto',
+      padding: '20px 0',
+    }}>
+      {bracket.rounds.map((roundData) => (
+        <div key={roundData.round} style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+        }}>
+          <h3 style={{
+            color: isDark ? '#fff' : '#333',
+            marginBottom: '10px',
+            fontSize: '18px',
+            fontWeight: 'bold',
+          }}>
+            第{roundData.round}回戦
+          </h3>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            {roundData.matches.map((match) => {
+              const isPlayer1 = match.player1.userId === user?.id
+              const isPlayer2 = match.player2.userId === user?.id
+              const isMyMatch = isPlayer1 || isPlayer2
+              const isBye = match.player1Id === match.player2Id
+              const winnerId = match.result === 'player1' ? match.player1Id : match.result === 'player2' ? match.player2Id : null
+              
+              return (
+                <div
+                  key={match.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
+                    padding: '12px',
+                    backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5',
+                    borderRadius: '8px',
+                    border: isMyMatch ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
+                  }}
+                >
+                  {/* Player 1 */}
+                  <div
+                    onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player1Id)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      backgroundColor: isDark ? '#1a1a1a' : '#fff',
+                      borderRadius: '6px',
+                      cursor: isMyMatch && !match.result ? 'pointer' : 'default',
+                      border: winnerId === match.player1Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
+                      fontWeight: winnerId === match.player1Id ? 'bold' : 'normal',
+                      color: isDark ? '#fff' : '#333',
+                      transition: 'all 0.2s',
+                      opacity: match.result && winnerId !== match.player1Id ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (isMyMatch && !match.result) {
+                        e.currentTarget.style.backgroundColor = isDark ? '#333' : '#e0e0e0'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (isMyMatch && !match.result) {
+                        e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#fff'
+                      }
+                    }}
+                  >
+                    {match.player1.user.name}
+                  </div>
+                  
+                  {/* VS */}
+                  <div style={{
+                    fontSize: '14px',
+                    color: isDark ? '#aaa' : '#666',
+                    fontWeight: 'bold',
+                  }}>
+                    {isBye ? 'BYE' : 'VS'}
+                  </div>
+                  
+                  {/* Player 2 */}
+                  {!isBye && (
+                    <div
+                      onClick={() => isMyMatch && !match.result && handlePlayerClick(match, match.player2Id)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        backgroundColor: isDark ? '#1a1a1a' : '#fff',
+                        borderRadius: '6px',
+                        cursor: isMyMatch && !match.result ? 'pointer' : 'default',
+                        border: winnerId === match.player2Id ? `2px solid ${isDark ? '#4CAF50' : '#2196F3'}` : `1px solid ${isDark ? '#444' : '#ddd'}`,
+                        fontWeight: winnerId === match.player2Id ? 'bold' : 'normal',
+                        color: isDark ? '#fff' : '#333',
+                        transition: 'all 0.2s',
+                        opacity: match.result && winnerId !== match.player2Id ? 0.5 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isMyMatch && !match.result) {
+                          e.currentTarget.style.backgroundColor = isDark ? '#333' : '#e0e0e0'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isMyMatch && !match.result) {
+                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#fff'
+                        }
+                      }}
+                    >
+                      {match.player2.user.name}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function TournamentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -99,6 +250,8 @@ export default function TournamentDetailPage() {
   const [lastNotifiedRound, setLastNotifiedRound] = useState<number>(0)
   const [isPreliminaryCompleted, setIsPreliminaryCompleted] = useState<boolean>(false)
   const [checkingPreliminaryCompleted, setCheckingPreliminaryCompleted] = useState<boolean>(false)
+  const [tournamentBracket, setTournamentBracket] = useState<TournamentBracket | null>(null)
+  const [loadingBracket, setLoadingBracket] = useState<boolean>(false)
 
   // モバイル判定
   useEffect(() => {
@@ -165,6 +318,21 @@ export default function TournamentDetailPage() {
       if (canEditTournament) {
         checkPreliminaryStatus()
       }
+    } else if (id && activeTab === 'finalTournament') {
+      // 決勝トーナメントデータを読み込む
+      const loadBracket = async () => {
+        try {
+          setLoadingBracket(true)
+          const bracket = await getTournamentBracket(id)
+          setTournamentBracket(bracket)
+        } catch (error) {
+          console.error('Failed to load tournament bracket:', error)
+          setTournamentBracket(null)
+        } finally {
+          setLoadingBracket(false)
+        }
+      }
+      loadBracket()
     }
   }, [id, activeTab, selectedRound])
 
@@ -807,6 +975,7 @@ export default function TournamentDetailPage() {
           { id: 'details' as TabType, label: 'イベント詳細' },
           { id: 'participants' as TabType, label: '参加者' },
           { id: 'tournament' as TabType, label: 'トーナメント' },
+          { id: 'finalTournament' as TabType, label: '決勝トーナメント' },
           { id: 'announcement' as TabType, label: 'アナウンス' },
         ].map((tab) => (
           <button
@@ -2642,6 +2811,82 @@ export default function TournamentDetailPage() {
       )}
 
       {/* アナウンスタブ */}
+      {/* 決勝トーナメントタブ */}
+      {activeTab === 'finalTournament' && (
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
+          <h2 style={{ color: isDark ? '#fff' : '#333', marginBottom: '20px' }}>決勝トーナメント</h2>
+          
+          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket && (
+            <div style={{ marginBottom: '20px' }}>
+              <button
+                onClick={async () => {
+                  if (!id) return
+                  try {
+                    setLoadingBracket(true)
+                    await createTournamentBracket(id)
+                    const bracket = await getTournamentBracket(id)
+                    setTournamentBracket(bracket)
+                    alert('決勝トーナメントを作成しました')
+                  } catch (error: any) {
+                    alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
+                  } finally {
+                    setLoadingBracket(false)
+                  }
+                }}
+                disabled={loadingBracket}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loadingBracket ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                }}
+              >
+                {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
+              </button>
+            </div>
+          )}
+
+          {tournamentBracket && tournamentBracket.rounds.length > 0 ? (
+            <TournamentBracketDisplay
+              bracket={tournamentBracket}
+              user={user}
+              isDark={isDark}
+              onWinnerSelect={async (matchId: string, winnerId: string) => {
+                if (!id) return
+                try {
+                  // 勝者を登録
+                  const match = tournamentBracket.matches.find(m => m.id === matchId)
+                  if (!match) return
+                  
+                  const result = match.player1Id === winnerId ? 'player1' : 'player2'
+                  await reportMatchResult(id, matchId, result)
+                  
+                  // ブラケットを再読み込み
+                  const updatedBracket = await getTournamentBracket(id)
+                  setTournamentBracket(updatedBracket)
+                } catch (error: any) {
+                  alert(error.response?.data?.message || '結果の登録に失敗しました')
+                }
+              }}
+            />
+          ) : (
+            <div style={{ 
+              padding: '40px', 
+              textAlign: 'center', 
+              color: isDark ? '#aaa' : '#666' 
+            }}>
+              {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted
+                ? '決勝トーナメントがまだ作成されていません。上記のボタンから作成してください。'
+                : '決勝トーナメントはまだ開始されていません。'}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'announcement' && (
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <div

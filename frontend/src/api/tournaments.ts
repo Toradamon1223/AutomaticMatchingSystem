@@ -269,3 +269,20 @@ export const announcePreliminaryStandings = async (tournamentId: string): Promis
   await apiClient.post(`/tournaments/${tournamentId}/announce-preliminary-standings`)
 }
 
+// 決勝トーナメント作成
+export const createTournamentBracket = async (tournamentId: string): Promise<{ matches: Match[] }> => {
+  const response = await apiClient.post<{ matches: Match[] }>(`/tournaments/${tournamentId}/create-tournament-bracket`)
+  return response.data
+}
+
+// 決勝トーナメントマッチ取得
+export interface TournamentBracket {
+  matches: Match[]
+  rounds: Array<{ round: number; matches: Match[] }>
+}
+
+export const getTournamentBracket = async (tournamentId: string): Promise<TournamentBracket> => {
+  const response = await apiClient.get<TournamentBracket>(`/tournaments/${tournamentId}/tournament-bracket`)
+  return response.data
+}
+
