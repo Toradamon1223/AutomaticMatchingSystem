@@ -380,11 +380,18 @@ export default function TournamentDetailPage() {
       const interval = setInterval(() => {
         loadMatches(selectedRound)
         loadStandings()
+        // 管理者/開催者の場合、予選完了判定もチェック
+        const isOrganizer = (user?.role === 'organizer' || user?.role === 'admin') && tournament?.organizerId === user?.id
+        const isAdmin = user?.role === 'admin'
+        const canEdit = isOrganizer || isAdmin
+        if (canEdit) {
+          checkPreliminaryStatus()
+        }
       }, 5000) // 5秒ごとに更新
 
       return () => clearInterval(interval)
     }
-  }, [id, activeTab, selectedRound, tournament?.status])
+  }, [id, activeTab, selectedRound, tournament?.status, tournament?.organizerId, user, checkPreliminaryStatus])
 
   // 新しい回戦が開始されたら通知を送る（10秒ごとにチェック）
   useEffect(() => {
@@ -3116,6 +3123,8 @@ export default function TournamentDetailPage() {
                             await reportMatchResult(id, selectedMatch.id, 'player1')
                             await loadMatches(selectedRound)
                             await loadStandings() // ランキングを再読み込み
+                            // 予選完了判定を再チェック
+                            await checkPreliminaryStatus()
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3144,6 +3153,8 @@ export default function TournamentDetailPage() {
                             await reportMatchResult(id, selectedMatch.id, 'player2')
                             await loadMatches(selectedRound)
                             await loadStandings() // ランキングを再読み込み
+                            // 予選完了判定を再チェック
+                            await checkPreliminaryStatus()
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3172,6 +3183,8 @@ export default function TournamentDetailPage() {
                             await reportMatchResult(id, selectedMatch.id, 'draw')
                             await loadMatches(selectedRound)
                             await loadStandings() // ランキングを再読み込み
+                            // 予選完了判定を再チェック
+                            await checkPreliminaryStatus()
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3201,6 +3214,8 @@ export default function TournamentDetailPage() {
                               await reportMatchResult(id, selectedMatch.id, 'both_loss')
                               await loadMatches(selectedRound)
                               await loadStandings() // ランキングを再読み込み
+                              // 予選完了判定を再チェック
+                              await checkPreliminaryStatus()
                               setShowResultDialog(false)
                               setSelectedMatch(null)
                               alert('結果を登録しました')
