@@ -3030,37 +3030,71 @@ export default function TournamentDetailPage() {
             </div>
           )}
           
-          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0) && (
-            <div style={{ marginBottom: '20px' }}>
-              <button
-                onClick={async () => {
-                  if (!id) return
-                  try {
-                    setLoadingBracket(true)
-                    await createTournamentBracket(id)
-                    const bracket = await getTournamentBracket(id)
-                    setTournamentBracket(bracket)
-                    alert('決勝トーナメントを作成しました')
-                  } catch (error: any) {
-                    alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
-                  } finally {
-                    setLoadingBracket(false)
-                  }
-                }}
-                disabled={loadingBracket}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: loadingBracket ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '16px',
-                }}
-              >
-                {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
-              </button>
+          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (
+            <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+              {tournamentBracket && tournamentBracket.rounds.length > 0 && (
+                <button
+                  onClick={async () => {
+                    if (!id) return
+                    if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                    try {
+                      await resetTournamentBracket(id)
+                      alert('決勝トーナメントをリセットしました')
+                      setTournamentBracket(null)
+                      await loadTournament()
+                    } catch (error: any) {
+                      console.error('Reset tournament bracket error:', error)
+                      const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                      alert(errorMessage)
+                    }
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    marginRight: '10px',
+                  }}
+                >
+                  決勝トーナメントリセット
+                </button>
+              )}
+              {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
+                <button
+                  onClick={async () => {
+                    if (!id) return
+                    if (!confirm('決勝トーナメントを作成しますか？')) return
+                    try {
+                      setLoadingBracket(true)
+                      await createTournamentBracket(id)
+                      const bracket = await getTournamentBracket(id)
+                      setTournamentBracket(bracket)
+                      alert('決勝トーナメントを作成しました')
+                    } catch (error: any) {
+                      alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
+                    } finally {
+                      setLoadingBracket(false)
+                    }
+                  }}
+                  disabled={loadingBracket}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: loadingBracket ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                  }}
+                >
+                  {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
+                </button>
+              )}
             </div>
           )}
 
