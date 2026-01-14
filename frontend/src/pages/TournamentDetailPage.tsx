@@ -2843,7 +2843,7 @@ export default function TournamentDetailPage() {
           <h2 style={{ color: isDark ? '#fff' : '#333', marginBottom: '20px' }}>決勝トーナメント</h2>
           
           {/* デバッグ情報（開発環境のみ） */}
-          {process.env.NODE_ENV === 'development' && (
+          {import.meta.env.DEV && (
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
               <div>canEditTournament: {String(canEditTournament)}</div>
               <div>tournament.status: {tournament.status}</div>
