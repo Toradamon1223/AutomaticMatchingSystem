@@ -348,7 +348,7 @@ export default function TournamentDetailPage() {
     const canEdit = isOrganizer || isAdmin
     
     if (activeTab === 'tournament') {
-      loadMatches(selectedRound)
+      loadMatches() // すべてのラウンドのマッチを読み込む
       loadStandings()
       // 予選完了判定をチェック（管理者/開催者のみ）
       if (canEdit) {
@@ -378,7 +378,7 @@ export default function TournamentDetailPage() {
   useEffect(() => {
     if (id && activeTab === 'tournament' && tournament?.status === 'in_progress') {
       const interval = setInterval(() => {
-        loadMatches(selectedRound)
+        loadMatches() // すべてのラウンドのマッチを読み込む
         loadStandings()
         // 管理者/開催者の場合、予選完了判定もチェック
         const isOrganizer = (user?.role === 'organizer' || user?.role === 'admin') && tournament?.organizerId === user?.id
@@ -514,7 +514,18 @@ export default function TournamentDetailPage() {
     if (!id) return
     try {
       const data = await getMatches(id, round)
-      setMatches(data)
+      if (round) {
+        // 特定のラウンドを読み込む場合、既存のマッチとマージする
+        setMatches((prevMatches: Match[]) => {
+          // そのラウンドの既存のマッチを削除
+          const filtered = prevMatches.filter((m: Match) => m.round !== round)
+          // 新しいマッチを追加
+          return [...filtered, ...data]
+        })
+      } else {
+        // すべてのラウンドを読み込む場合、そのまま設定
+        setMatches(data)
+      }
     } catch (error) {
       console.error('対戦一覧の取得に失敗しました', error)
     }
@@ -1976,7 +1987,7 @@ export default function TournamentDetailPage() {
                       await resetTournament(id)
                       alert('トーナメントをリセットしました')
                       await loadTournament()
-                      await loadMatches(1)
+                      await loadMatches() // すべてのラウンドのマッチを読み込む
                     } catch (error: any) {
                       console.error('Reset tournament error:', error)
                       const errorMessage = error.response?.data?.message || error.message || 'トーナメントのリセットに失敗しました'
@@ -2012,7 +2023,7 @@ export default function TournamentDetailPage() {
                         try {
                           await rematchRound1(id)
                           alert('対戦表を再作成しました')
-                          await loadMatches(selectedRound)
+                          await loadMatches() // すべてのラウンドのマッチを読み込む
                         } catch (error: any) {
                           alert(error.response?.data?.message || '対戦表の再作成に失敗しました')
                         }
@@ -2224,7 +2235,8 @@ export default function TournamentDetailPage() {
                                 key={round}
                                 onClick={() => {
                                   setSelectedRound(round)
-                                  loadMatches(round)
+                                  // ラウンド選択時は、すべてのラウンドのマッチを読み込む（既に読み込まれている場合は更新のみ）
+                                  loadMatches()
                                 }}
                                 style={{
                                   padding: isMobile ? '8px 16px' : '10px 20px',
@@ -2355,7 +2367,7 @@ export default function TournamentDetailPage() {
                                     await rematchRound(id, selectedRound)
                                     alert(`第${selectedRound}回戦の対戦表を再作成しました`)
                                     await loadTournament()
-                                    await loadMatches(selectedRound)
+                                    await loadMatches() // すべてのラウンドのマッチを読み込む
                                   } catch (error: any) {
                                     console.error('Rematch round error:', error)
                                     const errorMessage = error.response?.data?.message || error.message || '再マッチに失敗しました'
@@ -2383,7 +2395,7 @@ export default function TournamentDetailPage() {
                                     await startRound(id, selectedRound)
                                     alert(`第${selectedRound}回戦を開始しました`)
                                     await loadTournament()
-                                    await loadMatches(selectedRound)
+                                    await loadMatches() // すべてのラウンドのマッチを読み込む
                                   } catch (error: any) {
                                     console.error('Start round error:', error)
                                     const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
@@ -2426,7 +2438,7 @@ export default function TournamentDetailPage() {
                                   alert(`第${result.round}回戦の対戦表を作成しました`)
                                   await loadTournament()
                                   setSelectedRound(result.round)
-                                  await loadMatches(result.round)
+                                  await loadMatches() // すべてのラウンドのマッチを読み込む
                                 } catch (error: any) {
                                   console.error('Create next round error:', error)
                                   console.error('Error response:', error.response?.data)
