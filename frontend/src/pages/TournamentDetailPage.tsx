@@ -3088,6 +3088,7 @@ export default function TournamentDetailPage() {
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'player1')
                             await loadMatches(selectedRound)
+                            await loadStandings() // ランキングを再読み込み
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3115,6 +3116,7 @@ export default function TournamentDetailPage() {
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'player2')
                             await loadMatches(selectedRound)
+                            await loadStandings() // ランキングを再読み込み
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3142,6 +3144,7 @@ export default function TournamentDetailPage() {
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'draw')
                             await loadMatches(selectedRound)
+                            await loadStandings() // ランキングを再読み込み
                             setShowResultDialog(false)
                             setSelectedMatch(null)
                             alert('結果を登録しました')
@@ -3170,6 +3173,7 @@ export default function TournamentDetailPage() {
                             try {
                               await reportMatchResult(id, selectedMatch.id, 'both_loss')
                               await loadMatches(selectedRound)
+                              await loadStandings() // ランキングを再読み込み
                               setShowResultDialog(false)
                               setSelectedMatch(null)
                               alert('結果を登録しました')
