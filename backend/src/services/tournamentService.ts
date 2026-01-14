@@ -124,6 +124,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   // 同じ勝敗数の中からランダムに選ぶ方式
   const matches: any[] = []
   const used = new Set<string>()
+  const movedFromHigherGroup = new Set<string>() // 下グループから移動してきたプレーヤーを追跡
   let matchNumber = 1
   let tableNumber = 1
 
@@ -165,11 +166,27 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     
     console.log(`[generatePairings] Round ${round}: Processing ${record} points group, ${group.length} participants (after filtering used)`)
     
-    // グループをシャッフル（ランダム化）
-    for (let i = group.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [group[i], group[j]] = [group[j], group[i]]
+    // 下グループから移動してきたプレーヤーを先頭に固定
+    // 移動してきたプレーヤーはplayer1側になるべきなので、シャッフルから除外
+    const movedPlayers: typeof participants = []
+    const regularPlayers: typeof participants = []
+    
+    for (const player of group) {
+      if (movedFromHigherGroup.has(player.id)) {
+        movedPlayers.push(player)
+      } else {
+        regularPlayers.push(player)
+      }
     }
+    
+    // 通常のプレーヤーをシャッフル（ランダム化）
+    for (let i = regularPlayers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [regularPlayers[i], regularPlayers[j]] = [regularPlayers[j], regularPlayers[i]]
+    }
+    
+    // 移動してきたプレーヤーを先頭に配置
+    group = [...movedPlayers, ...regularPlayers]
 
     // 奇数人数の場合、次の勝ち点が低いグループに移動（下階段）
     if (group.length % 2 === 1 && recordIdx < sortedRecords.length - 1) {
@@ -180,6 +197,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         // 次のグループに移動（最初に対戦相手を選ぶ権利を持つ）
         const movedPlayer = group.pop()!
         nextGroup.unshift(movedPlayer) // 先頭に追加
+        movedFromHigherGroup.add(movedPlayer.id) // 移動してきたプレーヤーを記録
         recordGroups.set(nextRecord, nextGroup)
         // groupは空にならない（残りの偶数人数でマッチングを続ける）
         console.log(`[generatePairings] Round ${round}: ${record} points group - Moved 1 player to ${nextRecord} points group, ${group.length} participants remaining`)
