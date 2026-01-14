@@ -2127,7 +2127,18 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
       })
       const completedMatches = currentRoundMatches.filter((m: any) => m.result !== null).length
       const allMatchesCompleted = currentRoundMatches.length > 0 && completedMatches === currentRoundMatches.length
+      
+      // 予選順位発表済みかどうかをチェック（現在の回戦の全マッチが完了している場合、予選順位発表済みとみなす）
+      // または、currentRound >= preliminaryRounds かつ全マッチ完了の場合
       isCompleted = tournament.currentRound >= preliminaryRounds && allMatchesCompleted
+      
+      // もし currentRound < preliminaryRounds でも、全マッチが完了していれば予選完了とみなす
+      // （予選順位発表が押された場合、未完了マッチはBOTH_LOSSとして登録されるため）
+      if (!isCompleted && allMatchesCompleted && tournament.currentRound > 0) {
+        // 予選順位発表が押された可能性がある（全マッチが完了している）
+        // この場合、予選完了とみなす
+        isCompleted = true
+      }
     } else if (preliminaryRounds === 'until_one_undefeated') {
       // 全勝者が1人になるまで
       // 現在の回戦が完了していて、全勝者が1人かどうかを確認
