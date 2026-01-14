@@ -234,7 +234,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
               position: 'relative',
               zIndex: 1,
             }}>
-              {roundData.matches.map((match, matchIndex) => {
+              {roundData.matches.map((match) => {
                 const isPlayer1 = match.player1.userId === user?.id
                 const isPlayer2 = match.player2.userId === user?.id
                 const isMyMatch = isPlayer1 || isPlayer2
