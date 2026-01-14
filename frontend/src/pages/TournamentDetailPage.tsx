@@ -315,7 +315,9 @@ export default function TournamentDetailPage() {
     setCheckingPreliminaryCompleted(true)
     try {
       const result = await checkPreliminaryCompleted(id)
+      console.log('予選完了判定結果:', result)
       setIsPreliminaryCompleted(result.isCompleted)
+      console.log('isPreliminaryCompleted を設定:', result.isCompleted)
     } catch (error) {
       console.error('予選完了判定の確認に失敗しました', error)
     } finally {
@@ -2839,6 +2841,17 @@ export default function TournamentDetailPage() {
       {activeTab === 'finalTournament' && (
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
           <h2 style={{ color: isDark ? '#fff' : '#333', marginBottom: '20px' }}>決勝トーナメント</h2>
+          
+          {/* デバッグ情報（開発環境のみ） */}
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
+              <div>canEditTournament: {String(canEditTournament)}</div>
+              <div>tournament.status: {tournament.status}</div>
+              <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
+              <div>tournamentBracket: {tournamentBracket ? 'exists' : 'null'}</div>
+              <div>tournament.currentRound: {tournament.currentRound}</div>
+            </div>
+          )}
           
           {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket && (
             <div style={{ marginBottom: '20px' }}>

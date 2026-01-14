@@ -2118,26 +2118,54 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
       isCompleted = true
     } else if (typeof preliminaryRounds === 'number') {
       // 指定回戦数が完了しているか
+      // 予選回戦数（preliminaryRounds）の回戦が完了しているかどうかを確認
+      const preliminaryRoundMatches = await prisma.match.findMany({
+        where: {
+          tournamentId: tournament.id,
+          round: preliminaryRounds,
+          isTournamentMatch: true, // 実際の対戦マッチのみ
+        },
+      })
+      
+      // 予選回戦数の回戦が存在し、全て完了している場合
+      const preliminaryRoundCompleted = preliminaryRoundMatches.length > 0 && 
+        preliminaryRoundMatches.every((m: any) => m.result !== null)
+      
       // 現在の回戦が指定回戦数以上で、かつ現在の回戦の全マッチが完了しているか
       const currentRoundMatches = await prisma.match.findMany({
         where: {
           tournamentId: tournament.id,
           round: tournament.currentRound || 0,
+          isTournamentMatch: true, // 実際の対戦マッチのみ
         },
       })
       const completedMatches = currentRoundMatches.filter((m: any) => m.result !== null).length
       const allMatchesCompleted = currentRoundMatches.length > 0 && completedMatches === currentRoundMatches.length
       
-      // 予選順位発表済みかどうかをチェック（現在の回戦の全マッチが完了している場合、予選順位発表済みとみなす）
-      // または、currentRound >= preliminaryRounds かつ全マッチ完了の場合
-      isCompleted = tournament.currentRound >= preliminaryRounds && allMatchesCompleted
+      console.log(`[予選完了判定] tournamentId: ${tournament.id}, preliminaryRounds: ${preliminaryRounds}, currentRound: ${tournament.currentRound}`)
+      console.log(`[予選完了判定] preliminaryRoundMatches: ${preliminaryRoundMatches.length}, preliminaryRoundCompleted: ${preliminaryRoundCompleted}`)
+      console.log(`[予選完了判定] currentRoundMatches: ${currentRoundMatches.length}, completedMatches: ${completedMatches}, allMatchesCompleted: ${allMatchesCompleted}`)
       
-      // もし currentRound < preliminaryRounds でも、全マッチが完了していれば予選完了とみなす
+      // 予選回戦数の回戦が完了している場合、予選完了とみなす（最優先）
+      if (preliminaryRoundCompleted) {
+        isCompleted = true
+        console.log(`[予選完了判定] 予定回戦数(${preliminaryRounds}回戦)が完了しているため、予選完了と判定`)
+      }
+      // または、currentRound >= preliminaryRounds かつ現在の回戦の全マッチ完了の場合
+      // （予定回戦数に達していて、その回戦が完了している場合）
+      else if (tournament.currentRound >= preliminaryRounds && allMatchesCompleted) {
+        isCompleted = true
+        console.log(`[予選完了判定] 現在の回戦(${tournament.currentRound})が予定回戦数(${preliminaryRounds})以上で、全マッチ完了のため、予選完了と判定`)
+      }
+      // もし currentRound < preliminaryRounds でも、現在の回戦の全マッチが完了していれば予選完了とみなす
       // （予選順位発表が押された場合、未完了マッチはBOTH_LOSSとして登録されるため）
-      if (!isCompleted && allMatchesCompleted && tournament.currentRound > 0) {
+      else if (!isCompleted && allMatchesCompleted && tournament.currentRound > 0) {
         // 予選順位発表が押された可能性がある（全マッチが完了している）
         // この場合、予選完了とみなす
         isCompleted = true
+        console.log(`[予選完了判定] 現在の回戦(${tournament.currentRound})の全マッチが完了しているため、予選完了と判定`)
+      } else {
+        console.log(`[予選完了判定] 予選未完了: preliminaryRoundCompleted=${preliminaryRoundCompleted}, currentRound>=preliminaryRounds=${tournament.currentRound >= preliminaryRounds}, allMatchesCompleted=${allMatchesCompleted}`)
       }
     } else if (preliminaryRounds === 'until_one_undefeated') {
       // 全勝者が1人になるまで
