@@ -286,3 +286,8 @@ export const getTournamentBracket = async (tournamentId: string): Promise<Tourna
   return response.data
 }
 
+export const resetTournamentBracket = async (tournamentId: string): Promise<{ message: string; deletedMatches: number }> => {
+  const response = await apiClient.delete<{ message: string; deletedMatches: number }>(`/tournaments/${tournamentId}/tournament-bracket`)
+  return response.data
+}
+

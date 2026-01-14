@@ -27,6 +27,7 @@ import {
   announcePreliminaryStandings,
   createTournamentBracket,
   getTournamentBracket,
+  resetTournamentBracket,
   TournamentBracket,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
@@ -104,22 +105,25 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
   return (
     <div style={{
       display: 'flex',
-      flexDirection: 'column',
+      flexDirection: 'row',
       gap: '40px',
       overflowX: 'auto',
       padding: '20px 0',
+      alignItems: 'flex-start',
     }}>
       {bracket.rounds.map((roundData) => (
         <div key={roundData.round} style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '20px',
+          minWidth: '250px',
         }}>
           <h3 style={{
             color: isDark ? '#fff' : '#333',
             marginBottom: '10px',
             fontSize: '18px',
             fontWeight: 'bold',
+            textAlign: 'center',
           }}>
             第{roundData.round}回戦
           </h3>
@@ -368,6 +372,18 @@ export default function TournamentDetailPage() {
           setTournamentBracket(null)
         } finally {
           setLoadingBracket(false)
+        }
+      }
+      loadBracket()
+    } else if (activeTab === 'tournament') {
+      // トーナメントタブでも決勝トーナメントデータを読み込む（ボタン表示用）
+      const loadBracket = async () => {
+        try {
+          const bracket = await getTournamentBracket(id)
+          setTournamentBracket(bracket)
+        } catch (error) {
+          console.error('Failed to load tournament bracket:', error)
+          setTournamentBracket(null)
         }
       }
       loadBracket()
@@ -2090,23 +2106,69 @@ export default function TournamentDetailPage() {
                   >
                     予選順位表発表
                   </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('finalTournament')
-                    }}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: '#4CAF50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '16px',
-                    }}
-                  >
-                    決勝トーナメント作成へ
-                  </button>
+                  {tournamentBracket && tournamentBracket.rounds.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        if (!id) return
+                        if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                        try {
+                          await resetTournamentBracket(id)
+                          alert('決勝トーナメントをリセットしました')
+                          setTournamentBracket(null)
+                          await loadTournament()
+                        } catch (error: any) {
+                          console.error('Reset tournament bracket error:', error)
+                          const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                          alert(errorMessage)
+                        }
+                      }}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#f44336',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                        marginRight: '10px',
+                      }}
+                    >
+                      決勝トーナメントリセット
+                    </button>
+                  )}
+                  {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
+                    <button
+                      onClick={async () => {
+                        if (!id) return
+                        if (!confirm('決勝トーナメントを作成しますか？')) return
+                        try {
+                          setLoadingBracket(true)
+                          await createTournamentBracket(id)
+                          const bracket = await getTournamentBracket(id)
+                          setTournamentBracket(bracket)
+                          alert('決勝トーナメントを作成しました')
+                        } catch (error: any) {
+                          alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
+                        } finally {
+                          setLoadingBracket(false)
+                        }
+                      }}
+                      disabled={loadingBracket}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: loadingBracket ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                      }}
+                    >
+                      {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -2246,10 +2308,10 @@ export default function TournamentDetailPage() {
                                 style={{
                                   padding: isMobile ? '8px 16px' : '10px 20px',
                                   backgroundColor: isCurrentRound 
-                                    ? (isRoundCompleted ? (isDark ? '#333' : '#2196F3') : (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3')))
+                                    ? (isRoundCompleted ? (isDark ? '#333' : '#e0e0e0') : (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3')))
                                     : (isActiveRound && !isRoundCompleted ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
                                   color: isCurrentRound 
-                                    ? 'white'
+                                    ? (isRoundCompleted ? (isDark ? '#fff' : '#333') : 'white')
                                     : (isActiveRound && !isRoundCompleted
                                         ? (isDark ? '#4CAF50' : '#2e7d32')
                                         : (isPastRound 

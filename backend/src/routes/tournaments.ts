@@ -2358,5 +2358,45 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
   }
 })
 
+// 決勝トーナメントリセット（決勝トーナメントのマッチを削除）
+router.delete('/:id/tournament-bracket', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    // 予選の最終roundを取得（tournament.preliminaryRounds）
+    const preliminaryRounds = tournament.preliminaryRounds as number || 0
+
+    if (preliminaryRounds === 0) {
+      return res.json({ message: '予選の回戦数が設定されていません' })
+    }
+
+    // 決勝トーナメントのマッチを削除（予選の最終roundより後のround）
+    const deletedMatches = await prisma.match.deleteMany({
+      where: {
+        tournamentId: req.params.id,
+        round: { gt: preliminaryRounds },
+      },
+    })
+
+    res.json({ 
+      message: '決勝トーナメントをリセットしました',
+      deletedMatches: deletedMatches.count 
+    })
+  } catch (error) {
+    console.error('Reset tournament bracket error:', error)
+    res.status(500).json({ message: '決勝トーナメントのリセットに失敗しました' })
+  }
+})
+
 export default router
 
