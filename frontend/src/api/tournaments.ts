@@ -258,3 +258,14 @@ export const resetTournament = async (tournamentId: string): Promise<{ message: 
   return response.data
 }
 
+// 予選完了判定
+export const checkPreliminaryCompleted = async (tournamentId: string): Promise<{ isCompleted: boolean }> => {
+  const response = await apiClient.get<{ isCompleted: boolean }>(`/tournaments/${tournamentId}/preliminary-completed`)
+  return response.data
+}
+
+// 予選順位表発表（管理者または主催者のみ）
+export const announcePreliminaryStandings = async (tournamentId: string): Promise<void> => {
+  await apiClient.post(`/tournaments/${tournamentId}/announce-preliminary-standings`)
+}
+

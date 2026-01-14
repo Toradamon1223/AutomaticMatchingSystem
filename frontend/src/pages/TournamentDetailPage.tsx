@@ -23,6 +23,8 @@ import {
   startRound,
   rematchRound,
   resetTournament,
+  checkPreliminaryCompleted,
+  announcePreliminaryStandings,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
 import { format } from 'date-fns'
@@ -95,6 +97,8 @@ export default function TournamentDetailPage() {
   const [selectedRound, setSelectedRound] = useState<number>(1)
   const [isMobile, setIsMobile] = useState(false)
   const [lastNotifiedRound, setLastNotifiedRound] = useState<number>(0)
+  const [isPreliminaryCompleted, setIsPreliminaryCompleted] = useState<boolean>(false)
+  const [checkingPreliminaryCompleted, setCheckingPreliminaryCompleted] = useState<boolean>(false)
 
   // モバイル判定
   useEffect(() => {
@@ -157,8 +161,26 @@ export default function TournamentDetailPage() {
     if (id && activeTab === 'tournament') {
       loadMatches(selectedRound)
       loadStandings()
+      // 予選完了判定をチェック（管理者/開催者のみ）
+      if (canEditTournament) {
+        checkPreliminaryStatus()
+      }
     }
   }, [id, activeTab, selectedRound])
+
+  // 予選完了判定をチェック
+  const checkPreliminaryStatus = async () => {
+    if (!id || checkingPreliminaryCompleted) return
+    setCheckingPreliminaryCompleted(true)
+    try {
+      const result = await checkPreliminaryCompleted(id)
+      setIsPreliminaryCompleted(result.isCompleted)
+    } catch (error) {
+      console.error('予選完了判定の確認に失敗しました', error)
+    } finally {
+      setCheckingPreliminaryCompleted(false)
+    }
+  }
 
   // 対戦表画面で定期的にデータを更新（5秒ごと）
   useEffect(() => {
@@ -1811,6 +1833,40 @@ export default function TournamentDetailPage() {
                 </div>
               )}
 
+              {/* 予選順位表発表ボタン（管理者/開催者のみ、予選完了時） */}
+              {canEditTournament && isPreliminaryCompleted && (
+                <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                  <button
+                    onClick={async () => {
+                      if (!id) return
+                      if (!confirm('予選順位表を発表しますか？\n発表後、参加者に予選順位表が表示されます。')) return
+                      try {
+                        await announcePreliminaryStandings(id)
+                        alert('予選順位表を発表しました')
+                        await loadTournament()
+                        await checkPreliminaryStatus()
+                      } catch (error: any) {
+                        console.error('Announce preliminary standings error:', error)
+                        const errorMessage = error.response?.data?.message || error.message || '予選順位表の発表に失敗しました'
+                        alert(errorMessage)
+                      }
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#2196F3',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                    }}
+                  >
+                    予選順位表発表
+                  </button>
+                </div>
+              )}
+
               {/* メインタブ（対戦カード / ランキング） */}
               <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: `2px solid ${isDark ? '#333' : '#ddd'}` }}>
                 <button
@@ -2539,12 +2595,18 @@ export default function TournamentDetailPage() {
                             })
                             .map((standing, index) => {
                               const isMyRow = standing.participant.userId === user?.id
+                              // 決勝トーナメント進出人数のボーダーライン（tournamentSizeで判定）
+                              const cutLine = tournament?.tournamentSize || 0
+                              const isCutLine = cutLine > 0 && index + 1 === cutLine
                               return (
                                 <tr
                                   key={standing.participant.id}
                                   style={{
-                                    borderBottom: `1px solid ${isDark ? '#333' : '#ddd'}`,
+                                    borderBottom: isCutLine 
+                                      ? `3px solid ${isDark ? '#FF9800' : '#FF5722'}` 
+                                      : `1px solid ${isDark ? '#333' : '#ddd'}`,
                                     backgroundColor: isMyRow ? (isDark ? '#2a3a2a' : '#e8f5e9') : 'transparent',
+                                    fontWeight: isMyRow ? 'bold' : 'normal',
                                   }}
                                 >
                                   <td style={{ padding: '12px', fontWeight: 'bold' }}>{index + 1}</td>

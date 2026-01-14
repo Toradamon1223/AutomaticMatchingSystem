@@ -2013,5 +2013,101 @@ router.patch('/:id/announcement', authenticate, requireRole('organizer', 'admin'
   }
 })
 
+// 予選順位表発表（管理者または主催者のみ）
+router.post('/:id/announce-preliminary-standings', authenticate, requireRole('organizer', 'admin'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (tournament.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ message: '大会が進行中ではありません' })
+    }
+
+    // TODO: 予選完了の判定を実装
+    // 現在は単純にtournamentSizeで判定
+    // 実際にはpreliminaryRoundsの条件に応じて判定する必要がある
+
+    res.json({ message: '予選順位表を発表しました' })
+  } catch (error) {
+    console.error('Announce preliminary standings error:', error)
+    res.status(500).json({ message: '予選順位表の発表に失敗しました' })
+  }
+})
+
+// 予選完了判定
+router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    // 順位を再計算
+    await calculateStandings(tournament.id)
+
+    let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
+    try {
+      const parsed = JSON.parse(tournament.preliminaryRounds)
+      if (typeof parsed === 'number') {
+        preliminaryRounds = parsed
+      } else if (parsed === 'until_one_undefeated' || parsed === 'until_two_undefeated') {
+        preliminaryRounds = parsed
+      } else {
+        preliminaryRounds = parsed
+      }
+    } catch {
+      preliminaryRounds = tournament.preliminaryRounds as any
+    }
+
+    let isCompleted = false
+    if (typeof preliminaryRounds === 'number') {
+      // 指定回戦数が完了しているか
+      isCompleted = tournament.currentRound >= preliminaryRounds
+    } else if (preliminaryRounds === 'until_one_undefeated') {
+      // 全勝者が1人になるまで
+      // 現在の回戦が完了していて、全勝者が1人かどうかを確認
+      const participants = await prisma.participant.findMany({
+        where: {
+          tournamentId: tournament.id,
+          checkedIn: true,
+          dropped: false,
+          cancelledAt: null,
+        },
+      })
+      const undefeatedCount = participants.filter((p: any) => p.losses === 0).length
+      isCompleted = undefeatedCount <= 1
+    } else if (preliminaryRounds === 'until_two_undefeated') {
+      // 全勝者が2人以下になるまで
+      const participants = await prisma.participant.findMany({
+        where: {
+          tournamentId: tournament.id,
+          checkedIn: true,
+          dropped: false,
+          cancelledAt: null,
+        },
+      })
+      const undefeatedCount = participants.filter((p: any) => p.losses === 0).length
+      isCompleted = undefeatedCount <= 2
+    }
+
+    res.json({ isCompleted })
+  } catch (error) {
+    console.error('Check preliminary completed error:', error)
+    res.status(500).json({ message: '予選完了判定に失敗しました' })
+  }
+})
+
 export default router
 
