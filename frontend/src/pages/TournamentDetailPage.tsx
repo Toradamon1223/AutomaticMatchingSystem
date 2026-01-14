@@ -2145,6 +2145,7 @@ export default function TournamentDetailPage() {
                     const round6Completed = round6Matches.filter(m => m.result != null).length
                     const round6Total = round6Matches.length
                     const round6IsCompleted = round6Total > 0 && round6Completed === round6Total
+                    const round6IsActiveRound = tournament.currentRound === 6
                     return round6Matches.length > 0 && (
                       <div style={{
                         padding: '10px',
@@ -2159,6 +2160,8 @@ export default function TournamentDetailPage() {
                         <div>round6Completed: {round6Completed}</div>
                         <div>round6Total: {round6Total}</div>
                         <div>round6IsCompleted: {round6IsCompleted ? 'true' : 'false'}</div>
+                        <div>round6IsActiveRound: {round6IsActiveRound ? 'true' : 'false'}</div>
+                        <div>tournament.currentRound: {tournament.currentRound}</div>
                         <div style={{ marginTop: '5px', fontSize: '11px', opacity: 0.8 }}>
                           resultなしのマッチ: {round6Matches.filter(m => !m.result).map(m => m.id).join(', ') || 'なし'}
                         </div>
@@ -2280,12 +2283,24 @@ export default function TournamentDetailPage() {
                                       {roundCompleted}/{roundTotal}
                                     </div>
                                   )}
+                                  {/* デバッグ情報（6回戦の場合のみ） */}
+                                  {round === 6 && (
+                                    <div style={{ 
+                                      fontSize: '8px',
+                                      marginTop: '2px',
+                                      opacity: 0.6,
+                                      color: isDark ? '#888' : '#999',
+                                    }}>
+                                      {isRoundCompleted ? '✓完了' : (isActiveRound ? '進行中' : '未開始')}
+                                    </div>
+                                  )}
                                   {isRoundCompleted ? (
                                     <div style={{ 
                                       fontSize: '9px',
                                       marginTop: '2px',
                                       opacity: 0.7,
                                       color: isDark ? '#4CAF50' : '#2e7d32',
+                                      fontWeight: 'bold',
                                     }}>
                                       完了
                                     </div>
@@ -2922,22 +2937,22 @@ export default function TournamentDetailPage() {
               <div>canEditTournament: {String(canEditTournament)}</div>
               <div>tournament.status: {tournament.status} (必要: 'in_progress')</div>
               <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)} (必要: true)</div>
-              <div>tournamentBracket: {tournamentBracket ? 'exists' : 'null'} (必要: null)</div>
+              <div>tournamentBracket: {tournamentBracket ? (tournamentBracket.rounds.length > 0 ? 'exists (rounds: ' + tournamentBracket.rounds.length + ')' : 'empty (rounds: 0)') : 'null'} (必要: null or empty)</div>
               <div>tournament.currentRound: {tournament.currentRound}</div>
               <div>tournament.preliminaryRounds: {String(tournament.preliminaryRounds)}</div>
               <div style={{ marginTop: '10px', padding: '5px', backgroundColor: isDark ? '#444' : '#e0e0e0', borderRadius: '3px' }}>
                 <strong>表示条件チェック:</strong>
                 <div>canEditTournament && status === 'in_progress': {String(canEditTournament && tournament.status === 'in_progress')}</div>
                 <div>isPreliminaryCompleted: {String(isPreliminaryCompleted)}</div>
-                <div>!tournamentBracket: {String(!tournamentBracket)}</div>
-                <div style={{ marginTop: '5px', fontWeight: 'bold', color: (canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket) ? 'green' : 'red' }}>
-                  ボタン表示: {String(canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket)}
+                <div>!tournamentBracket || rounds.length === 0: {String(!tournamentBracket || (tournamentBracket && tournamentBracket.rounds.length === 0))}</div>
+                <div style={{ marginTop: '5px', fontWeight: 'bold', color: (canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0)) ? 'green' : 'red' }}>
+                  ボタン表示: {String(canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0))}
                 </div>
               </div>
             </div>
           )}
           
-          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && !tournamentBracket && (
+          {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (!tournamentBracket || tournamentBracket.rounds.length === 0) && (
             <div style={{ marginBottom: '20px' }}>
               <button
                 onClick={async () => {
@@ -3198,7 +3213,7 @@ export default function TournamentDetailPage() {
                           if (!id) return
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'player1')
-                            await loadMatches(selectedRound)
+                            await loadMatches() // すべてのラウンドのマッチを再読み込み
                             await loadStandings() // ランキングを再読み込み
                             // 予選完了判定を再チェック
                             await checkPreliminaryStatus()
@@ -3228,7 +3243,7 @@ export default function TournamentDetailPage() {
                           if (!id) return
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'player2')
-                            await loadMatches(selectedRound)
+                            await loadMatches() // すべてのラウンドのマッチを再読み込み
                             await loadStandings() // ランキングを再読み込み
                             // 予選完了判定を再チェック
                             await checkPreliminaryStatus()
@@ -3258,7 +3273,7 @@ export default function TournamentDetailPage() {
                           if (!id) return
                           try {
                             await reportMatchResult(id, selectedMatch.id, 'draw')
-                            await loadMatches(selectedRound)
+                            await loadMatches() // すべてのラウンドのマッチを再読み込み
                             await loadStandings() // ランキングを再読み込み
                             // 予選完了判定を再チェック
                             await checkPreliminaryStatus()
@@ -3289,7 +3304,7 @@ export default function TournamentDetailPage() {
                             if (!id) return
                             try {
                               await reportMatchResult(id, selectedMatch.id, 'both_loss')
-                              await loadMatches(selectedRound)
+                              await loadMatches() // すべてのラウンドのマッチを再読み込み
                               await loadStandings() // ランキングを再読み込み
                               // 予選完了判定を再チェック
                               await checkPreliminaryStatus()
