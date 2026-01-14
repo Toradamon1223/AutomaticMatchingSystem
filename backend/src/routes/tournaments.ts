@@ -2374,9 +2374,21 @@ router.delete('/:id/tournament-bracket', authenticate, requireRole('organizer', 
     }
 
     // 予選の最終roundを取得（tournament.preliminaryRounds）
-    const preliminaryRounds = tournament.preliminaryRounds as number || 0
+    let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
+    try {
+      const parsed = JSON.parse(tournament.preliminaryRounds)
+      if (typeof parsed === 'number') {
+        preliminaryRounds = parsed
+      } else if (parsed === 'until_one_undefeated' || parsed === 'until_two_undefeated') {
+        preliminaryRounds = parsed
+      } else {
+        preliminaryRounds = parsed
+      }
+    } catch {
+      return res.status(400).json({ message: '予選の回戦数が正しく設定されていません' })
+    }
 
-    if (preliminaryRounds === 0) {
+    if (typeof preliminaryRounds !== 'number' || preliminaryRounds === 0) {
       return res.json({ message: '予選の回戦数が設定されていません' })
     }
 
