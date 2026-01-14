@@ -2105,37 +2105,40 @@ export default function TournamentDetailPage() {
                   >
                     予選順位表発表
                   </button>
-                  {tournamentBracket && tournamentBracket.rounds.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        if (!id) return
-                        if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
-                        try {
-                          await resetTournamentBracket(id)
-                          alert('決勝トーナメントをリセットしました')
-                          setTournamentBracket(null)
-                          await loadTournament()
-                        } catch (error: any) {
-                          console.error('Reset tournament bracket error:', error)
-                          const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
-                          alert(errorMessage)
+                  <button
+                    onClick={async () => {
+                      if (!id) return
+                      if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                      try {
+                        await resetTournamentBracket(id)
+                        alert('決勝トーナメントをリセットしました')
+                        setTournamentBracket(null)
+                        await loadTournament()
+                        // トーナメントタブの場合は、決勝トーナメントデータを再読み込み
+                        if (activeTab === 'tournament') {
+                          const bracket = await getTournamentBracket(id)
+                          setTournamentBracket(bracket)
                         }
-                      }}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#f44336',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                        marginRight: '10px',
-                      }}
-                    >
-                      決勝トーナメントリセット
-                    </button>
-                  )}
+                      } catch (error: any) {
+                        console.error('Reset tournament bracket error:', error)
+                        const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                        alert(errorMessage)
+                      }
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      marginRight: '10px',
+                    }}
+                  >
+                    決勝トーナメントリセット
+                  </button>
                   {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
                     <button
                       onClick={async () => {
@@ -3032,37 +3035,40 @@ export default function TournamentDetailPage() {
           
           {canEditTournament && tournament.status === 'in_progress' && isPreliminaryCompleted && (
             <div style={{ marginBottom: '20px', textAlign: 'center' }}>
-              {tournamentBracket && tournamentBracket.rounds.length > 0 && (
-                <button
-                  onClick={async () => {
-                    if (!id) return
-                    if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
-                    try {
-                      await resetTournamentBracket(id)
-                      alert('決勝トーナメントをリセットしました')
-                      setTournamentBracket(null)
-                      await loadTournament()
-                    } catch (error: any) {
-                      console.error('Reset tournament bracket error:', error)
-                      const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
-                      alert(errorMessage)
+              <button
+                onClick={async () => {
+                  if (!id) return
+                  if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                  try {
+                    await resetTournamentBracket(id)
+                    alert('決勝トーナメントをリセットしました')
+                    setTournamentBracket(null)
+                    await loadTournament()
+                    // 決勝トーナメントタブの場合は、決勝トーナメントデータを再読み込み
+                    if (activeTab === 'finalTournament') {
+                      const bracket = await getTournamentBracket(id)
+                      setTournamentBracket(bracket)
                     }
-                  }}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '16px',
-                    marginRight: '10px',
-                  }}
-                >
-                  決勝トーナメントリセット
-                </button>
-              )}
+                  } catch (error: any) {
+                    console.error('Reset tournament bracket error:', error)
+                    const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                    alert(errorMessage)
+                  }
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  marginRight: '10px',
+                }}
+              >
+                決勝トーナメントリセット
+              </button>
               {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
                 <button
                   onClick={async () => {
