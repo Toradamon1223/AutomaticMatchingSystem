@@ -2485,28 +2485,32 @@ export default function TournamentDetailPage() {
                               }
                               return 0
                             })
-                            .map((standing, index) => (
-                              <tr
-                                key={standing.participant.id}
-                                style={{
-                                  borderBottom: `1px solid ${isDark ? '#333' : '#ddd'}`,
-                                }}
-                              >
-                                <td style={{ padding: '12px', fontWeight: 'bold' }}>{index + 1}</td>
-                                <td style={{ padding: '12px' }}>{standing.participant.user.name}</td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>
-                                  {standing.participant.wins}-{standing.participant.losses}-{standing.participant.draws}
-                                </td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>{standing.points}</td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>
-                                  {standing.omw ? (standing.omw * 100).toFixed(2) : '0.00'}%
-                                </td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>{standing.gameWins || standing.participant.wins}</td>
-                                <td style={{ padding: '12px', textAlign: 'center' }}>
-                                  {standing.averageOmw ? (standing.averageOmw * 100).toFixed(2) : '0.00'}%
-                                </td>
-                              </tr>
-                            ))}
+                            .map((standing, index) => {
+                              const isMyRow = standing.participant.userId === user?.id
+                              return (
+                                <tr
+                                  key={standing.participant.id}
+                                  style={{
+                                    borderBottom: `1px solid ${isDark ? '#333' : '#ddd'}`,
+                                    backgroundColor: isMyRow ? (isDark ? '#2a3a2a' : '#e8f5e9') : 'transparent',
+                                  }}
+                                >
+                                  <td style={{ padding: '12px', fontWeight: 'bold' }}>{index + 1}</td>
+                                  <td style={{ padding: '12px', fontWeight: isMyRow ? 'bold' : 'normal' }}>{standing.participant.user.name}</td>
+                                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>
+                                    {standing.participant.wins}-{standing.participant.losses}-{standing.participant.draws}
+                                  </td>
+                                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>{standing.points}</td>
+                                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>
+                                    {standing.omw ? (standing.omw * 100).toFixed(2) : '0.00'}%
+                                  </td>
+                                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>{standing.gameWins || standing.participant.wins}</td>
+                                  <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>
+                                    {standing.averageOmw ? (standing.averageOmw * 100).toFixed(2) : '0.00'}%
+                                  </td>
+                                </tr>
+                              )
+                            })}
                         </tbody>
                       </table>
                     </div>
