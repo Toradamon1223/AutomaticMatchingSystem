@@ -2246,19 +2246,19 @@ export default function TournamentDetailPage() {
                                 style={{
                                   padding: isMobile ? '8px 16px' : '10px 20px',
                                   backgroundColor: isCurrentRound 
-                                    ? (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3'))
-                                    : (isActiveRound ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
+                                    ? (isRoundCompleted ? (isDark ? '#333' : '#2196F3') : (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3')))
+                                    : (isActiveRound && !isRoundCompleted ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
                                   color: isCurrentRound 
                                     ? 'white'
-                                    : (isActiveRound 
+                                    : (isActiveRound && !isRoundCompleted
                                         ? (isDark ? '#4CAF50' : '#2e7d32')
                                         : (isPastRound 
                                             ? (isDark ? '#888' : '#999')
                                             : (isDark ? '#fff' : '#333'))),
                                   border: `2px solid ${
                                     isCurrentRound 
-                                      ? (isActiveRound ? '#4CAF50' : '#2196F3')
-                                      : (isActiveRound 
+                                      ? (isRoundCompleted ? '#2196F3' : (isActiveRound ? '#4CAF50' : '#2196F3'))
+                                      : (isActiveRound && !isRoundCompleted
                                           ? (isDark ? '#4CAF50' : '#4CAF50')
                                           : (isDark ? '#444' : '#ddd'))
                                   }`,

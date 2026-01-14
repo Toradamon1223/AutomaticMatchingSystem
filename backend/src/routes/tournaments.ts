@@ -1,7 +1,7 @@
 import express from 'express'
 import { prisma } from '../lib/prisma'
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth'
-import { generatePairings, calculateStandings, generateTournamentBracket } from '../services/tournamentService'
+import { generatePairings, calculateStandings, generateTournamentBracket, generateNextTournamentRound } from '../services/tournamentService'
 import { transformTournament, transformMatch } from '../utils/tournamentTransform'
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 import QRCode from 'qrcode'
@@ -1221,23 +1221,52 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
     const round = updatedMatch.round
     ;(async () => {
       try {
+        // 予選の最大roundを取得
+        const maxPreliminaryRound = await prisma.match.findFirst({
+          where: { tournamentId: req.params.id },
+          orderBy: { round: 'desc' },
+          select: { round: true },
+        })
+        
+        // 決勝トーナメントのラウンドかどうかを判定（予選の最終roundより後のround）
+        const isTournamentRound = maxPreliminaryRound && round > maxPreliminaryRound.round
+
         const totalMatchesInRound = await prisma.match.count({
           where: {
             tournamentId: req.params.id,
             round,
+            isTournamentMatch: true, // 決勝トーナメントの場合はisTournamentMatch: trueのみ
           },
         })
         const completedMatchesInRound = await prisma.match.count({
           where: {
             tournamentId: req.params.id,
             round,
+            isTournamentMatch: true,
             result: { not: null },
           },
         })
 
-        // 全対戦が完了した場合、または管理者/開催者が結果を修正した場合は順位計算を実行
-        if (totalMatchesInRound === completedMatchesInRound || (isAdmin || isOrganizer)) {
-          await calculateStandings(req.params.id)
+        // 全対戦が完了した場合
+        if (totalMatchesInRound > 0 && totalMatchesInRound === completedMatchesInRound) {
+          // 決勝トーナメントのラウンドの場合、次のラウンドを自動生成
+          if (isTournamentRound) {
+            try {
+              await generateNextTournamentRound(req.params.id, round)
+              console.log(`[Report result] Generated next tournament round for round ${round + 1}`)
+            } catch (error: any) {
+              console.error('Failed to generate next tournament round:', error)
+              // エラーが発生しても続行（既に次のラウンドが存在する場合など）
+            }
+          } else {
+            // 予選の場合は順位計算を実行
+            await calculateStandings(req.params.id)
+          }
+        } else if (isAdmin || isOrganizer) {
+          // 管理者/開催者が結果を修正した場合も順位計算を実行
+          if (!isTournamentRound) {
+            await calculateStandings(req.params.id)
+          }
         }
       } catch (error) {
         console.error('Background standings calculation error:', error)

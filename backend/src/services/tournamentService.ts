@@ -680,6 +680,161 @@ export async function generateTournamentBracket(tournamentId: string): Promise<a
   return matches
 }
 
+// 決勝トーナメントの次のラウンドを生成（シングルエリミネーション形式）
+export async function generateNextTournamentRound(tournamentId: string, currentRound: number): Promise<any[]> {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+  })
+
+  if (!tournament) {
+    throw new Error('大会が見つかりません')
+  }
+
+  // 現在のラウンドの全マッチを取得
+  const currentRoundMatches = await prisma.match.findMany({
+    where: {
+      tournamentId,
+      round: currentRound,
+      isTournamentMatch: true,
+    },
+    include: {
+      player1: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      player2: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  // 勝者を取得（シングルエリミネーションなので、勝者のみが次ラウンドに進む）
+  const winners: string[] = []
+  for (const match of currentRoundMatches) {
+    if (!match.result) {
+      throw new Error(`Round ${currentRound} のマッチ ${match.id} に結果がありません`)
+    }
+    
+    if (match.result === 'PLAYER1') {
+      winners.push(match.player1Id)
+    } else if (match.result === 'PLAYER2') {
+      winners.push(match.player2Id)
+    } else if (match.result === 'DRAW') {
+      // 引き分けの場合は両者とも次ラウンドに進む（通常は発生しないが、念のため）
+      winners.push(match.player1Id)
+      winners.push(match.player2Id)
+    }
+    // BOTH_LOSSの場合は誰も進まない
+  }
+
+  if (winners.length === 0) {
+    throw new Error('次ラウンドに進む参加者がいません')
+  }
+
+  // 次のラウンドのマッチを生成
+  const nextRound = currentRound + 1
+  const matches: any[] = []
+  let matchNumber = 1
+  let tableNumber = 1
+
+  // 勝者をペアリング（順番にペアにする）
+  for (let i = 0; i < winners.length; i += 2) {
+    const player1Id = winners[i]
+    const player2Id = winners[i + 1] || null
+
+    // BYEマッチの場合
+    if (!player2Id) {
+      const match = await prisma.match.create({
+        data: {
+          tournamentId,
+          round: nextRound,
+          matchNumber: matchNumber++,
+          player1Id: player1Id,
+          player2Id: player1Id, // BYEマッチ
+          tableNumber: tableNumber++,
+          result: 'PLAYER1', // 自動勝利
+          isTournamentMatch: true,
+        },
+        include: {
+          player1: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          player2: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      matches.push(match)
+    } else {
+      const match = await prisma.match.create({
+        data: {
+          tournamentId,
+          round: nextRound,
+          matchNumber: matchNumber++,
+          player1Id: player1Id,
+          player2Id: player2Id,
+          tableNumber: tableNumber++,
+          isTournamentMatch: true,
+        },
+        include: {
+          player1: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+          player2: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      })
+      matches.push(match)
+    }
+  }
+
+  console.log(`[generateNextTournamentRound] Created ${matches.length} matches for round ${nextRound}`)
+
+  return matches
+}
+
 // オポネント方式による順位計算
 export async function calculateStandings(tournamentId: string): Promise<void> {
   // 第1回戦以降は、前の回戦に参加した参加者の順位を計算する
