@@ -691,43 +691,111 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       ? opponentMWs.reduce((a, b) => a + b, 0) / opponentMWs.length
       : 0
 
-    // OOMW%（平均OMW%）は各対戦相手のMW%の平均（調整なし）
-    const opponentMWsUnadjusted: number[] = []
-    for (const opponent of Array.from(uniqueOpponents.values())) {
-      const opponentMatchesCount = opponent.wins + opponent.losses + opponent.draws
-      if (opponentMatchesCount > 0) {
-        const opponentMatchPoints = opponent.points || (opponent.wins * 3 + opponent.draws * 1)
-        const maxPossiblePoints = opponentMatchesCount * 3
-        const opponentMW = opponentMatchPoints / maxPossiblePoints
-        opponentMWsUnadjusted.push(opponentMW)
+    // 勝手累点（ゲームウィン）は現在の実装ではwinsと同じ
+    const gameWins = wins
+
+    return {
+      participantId: participant.id,
+      participant,
+      wins,
+      losses,
+      draws,
+      points,
+      omw,
+      gameWins,
+      uniqueOpponents: Array.from(uniqueOpponents.keys()),
+    }
+  })
+
+  // OMW%を先に計算・更新
+  const batchSize = 5
+  for (let i = 0; i < updatePromises.length; i += batchSize) {
+    const batch = updatePromises.slice(i, i + batchSize)
+    const results = await Promise.all(batch)
+    
+    // OMW%を更新
+    for (const result of results) {
+      await prisma.participant.update({
+        where: { id: result.participantId },
+        data: {
+          wins: result.wins,
+          losses: result.losses,
+          draws: result.draws,
+          points: result.points,
+          omw: result.omw,
+          gameWins: result.gameWins,
+        },
+      })
+    }
+  }
+
+  // OOMW%を計算（対戦相手のOMW%の平均）
+  // 全参加者のOMW%を取得
+  const allParticipantsWithOmw = await prisma.participant.findMany({
+    where: {
+      tournamentId,
+      checkedIn: true,
+      dropped: false,
+      cancelledAt: null,
+    },
+    select: {
+      id: true,
+      omw: true,
+    },
+  })
+
+  const omwMap = new Map<string, number>()
+  for (const p of allParticipantsWithOmw) {
+    omwMap.set(p.id, p.omw || 0)
+  }
+
+  // 各参加者のOOMW%を計算
+  const oomwUpdatePromises = participants.map(async (participant) => {
+    // バイの試合（player1Id === player2Id）を除外してマッチを取得
+    const allMatches = [
+      ...participant.matchesAsPlayer1
+        .filter((m) => m.player1Id !== m.player2Id)
+        .map((m) => ({
+          opponentId: m.player2Id,
+        })),
+      ...participant.matchesAsPlayer2
+        .filter((m) => m.player1Id !== m.player2Id)
+        .map((m) => ({
+          opponentId: m.player1Id,
+        })),
+    ]
+
+    // 対戦相手を重複排除
+    const uniqueOpponentIds = new Set<string>()
+    for (const match of allMatches) {
+      uniqueOpponentIds.add(match.opponentId)
+    }
+
+    // 対戦相手のOMW%を取得
+    const opponentOmws: number[] = []
+    for (const opponentId of uniqueOpponentIds) {
+      const opponentOmw = omwMap.get(opponentId)
+      if (opponentOmw !== undefined && opponentOmw > 0) {
+        opponentOmws.push(opponentOmw)
       }
     }
 
-    const averageOmw = opponentMWsUnadjusted.length > 0
-      ? opponentMWsUnadjusted.reduce((a, b) => a + b, 0) / opponentMWsUnadjusted.length
+    // OOMW% = 全対戦相手のOMW%の平均
+    const averageOmw = opponentOmws.length > 0
+      ? opponentOmws.reduce((a, b) => a + b, 0) / opponentOmws.length
       : 0
-
-    // 勝手累点（ゲームウィン）は現在の実装ではwinsと同じ
-    const gameWins = wins
 
     return prisma.participant.update({
       where: { id: participant.id },
       data: {
-        wins,
-        losses,
-        draws,
-        points,
-        omw,
         averageOmw,
-        gameWins,
       },
     })
   })
 
-  // バッチ更新を並列実行（接続プールの枯渇を防ぐため、一度に処理する数を制限）
-  const batchSize = 5
-  for (let i = 0; i < updatePromises.length; i += batchSize) {
-    const batch = updatePromises.slice(i, i + batchSize)
+  // OOMW%を更新
+  for (let i = 0; i < oomwUpdatePromises.length; i += batchSize) {
+    const batch = oomwUpdatePromises.slice(i, i + batchSize)
     await Promise.all(batch)
   }
 
