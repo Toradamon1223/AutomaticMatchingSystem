@@ -2032,9 +2032,33 @@ router.post('/:id/announce-preliminary-standings', authenticate, requireRole('or
       return res.status(400).json({ message: '大会が進行中ではありません' })
     }
 
-    // TODO: 予選完了の判定を実装
-    // 現在は単純にtournamentSizeで判定
-    // 実際にはpreliminaryRoundsの条件に応じて判定する必要がある
+    // 現在の回戦（最終回戦）の未完了マッチを完了状態にする
+    const currentRound = tournament.currentRound || 0
+    if (currentRound > 0) {
+      // 現在の回戦の全マッチを取得
+      const currentRoundMatches = await prisma.match.findMany({
+        where: {
+          tournamentId: req.params.id,
+          round: currentRound,
+          result: null, // 結果が未登録のマッチ
+        },
+      })
+
+      // 未登録のマッチを両者敗北として登録（予選順位発表時点で未完了のマッチは両者敗北として扱う）
+      for (const match of currentRoundMatches) {
+        await prisma.match.update({
+          where: { id: match.id },
+          data: {
+            result: 'BOTH_LOSS',
+            reportedBy: req.userId!,
+            reportedAt: getJSTNow(),
+          },
+        })
+      }
+
+      // 順位を再計算（両者敗北のマッチを含めて）
+      await calculateStandings(req.params.id)
+    }
 
     res.json({ message: '予選順位表を発表しました' })
   } catch (error) {
