@@ -2616,7 +2616,7 @@ export default function TournamentDetailPage() {
                                   </td>
                                   <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>{standing.points}</td>
                                   <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>
-                                    {standing.omw ? Math.round(standing.omw * 1000) / 10 : '0.0'}%
+                                    {standing.omw ? (Math.round(standing.omw * 1000) / 10).toFixed(1) : '0.0'}%
                                   </td>
                                   <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>{standing.gameWins || standing.participant.wins}</td>
                                   <td style={{ padding: '12px', textAlign: 'center', fontWeight: isMyRow ? 'bold' : 'normal' }}>
