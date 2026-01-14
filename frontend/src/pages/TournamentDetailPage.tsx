@@ -2139,6 +2139,32 @@ export default function TournamentDetailPage() {
                 </div>
               ) : tournamentViewTab === 'matches' ? (
                 <div>
+                  {/* 6回戦完了判定デバッグ情報 */}
+                  {(() => {
+                    const round6Matches = matches.filter(m => m.round === 6 && m.isTournamentMatch)
+                    const round6Completed = round6Matches.filter(m => m.result != null && m.result !== '').length
+                    const round6Total = round6Matches.length
+                    const round6IsCompleted = round6Total > 0 && round6Completed === round6Total
+                    return round6Matches.length > 0 && (
+                      <div style={{
+                        padding: '10px',
+                        marginBottom: '15px',
+                        backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: isDark ? '#fff' : '#333',
+                      }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>6回戦完了判定デバッグ:</div>
+                        <div>round6Matches: {round6Matches.length}</div>
+                        <div>round6Completed: {round6Completed}</div>
+                        <div>round6Total: {round6Total}</div>
+                        <div>round6IsCompleted: {round6IsCompleted ? 'true' : 'false'}</div>
+                        <div style={{ marginTop: '5px', fontSize: '11px', opacity: 0.8 }}>
+                          resultなしのマッチ: {round6Matches.filter(m => !m.result || m.result === '').map(m => m.id).join(', ') || 'なし'}
+                        </div>
+                      </div>
+                    )
+                  })()}
                   {/* 回戦タブ */}
                   {(() => {
                     // マッチから取得したラウンドと、tournament.currentRoundから推測されるラウンドを結合
@@ -2175,12 +2201,20 @@ export default function TournamentDetailPage() {
                           {rounds.map((round) => {
                             // 実際の対戦マッチのみをカウント（isTournamentMatch: true）
                             const roundMatches = matches.filter(m => m.round === round && m.isTournamentMatch)
-                            const roundCompleted = roundMatches.filter(m => m.result).length
+                            // resultがnullでなく、空文字列でもないことを確認
+                            const roundCompleted = roundMatches.filter(m => m.result != null && m.result !== '').length
                             const roundTotal = roundMatches.length
                             const isCurrentRound = round === selectedRound
                             const isActiveRound = round === tournament.currentRound
                             const isPastRound = round < (tournament.currentRound || 0)
                             const isRoundCompleted = roundTotal > 0 && roundCompleted === roundTotal
+                            
+                            // デバッグログ（6回戦の場合のみ）
+                            if (round === 6) {
+                              console.log(`[6回戦完了判定] roundMatches: ${roundMatches.length}, roundCompleted: ${roundCompleted}, roundTotal: ${roundTotal}, isRoundCompleted: ${isRoundCompleted}`)
+                              console.log(`[6回戦完了判定] matches詳細:`, roundMatches.map(m => ({ id: m.id, result: m.result, isTournamentMatch: m.isTournamentMatch })))
+                              console.log(`[6回戦完了判定] resultなしのマッチ:`, roundMatches.filter(m => !m.result || m.result === '').map(m => ({ id: m.id, result: m.result })))
+                            }
 
                             return (
                               <button
@@ -2246,16 +2280,7 @@ export default function TournamentDetailPage() {
                                       {roundCompleted}/{roundTotal}
                                     </div>
                                   )}
-                                  {isActiveRound && !isRoundCompleted && (
-                                    <div style={{ 
-                                      fontSize: '9px',
-                                      marginTop: '2px',
-                                      opacity: 0.8,
-                                    }}>
-                                      実施中
-                                    </div>
-                                  )}
-                                  {isRoundCompleted && (
+                                  {isRoundCompleted ? (
                                     <div style={{ 
                                       fontSize: '9px',
                                       marginTop: '2px',
@@ -2263,6 +2288,14 @@ export default function TournamentDetailPage() {
                                       color: isDark ? '#4CAF50' : '#2e7d32',
                                     }}>
                                       完了
+                                    </div>
+                                  ) : isActiveRound && (
+                                    <div style={{ 
+                                      fontSize: '9px',
+                                      marginTop: '2px',
+                                      opacity: 0.8,
+                                    }}>
+                                      実施中
                                     </div>
                                   )}
                                 </div>
