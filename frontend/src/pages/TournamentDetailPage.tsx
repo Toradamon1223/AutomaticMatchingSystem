@@ -2033,8 +2033,8 @@ export default function TournamentDetailPage() {
                 </div>
               )}
 
-              {/* デバッグ情報（開発環境のみ） */}
-              {import.meta.env.DEV && (
+              {/* デバッグ情報 */}
+              {(
                 <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
                   <div><strong>予選順位表発表ボタンの表示条件:</strong></div>
                   <div>canEditTournament: {String(canEditTournament)}</div>
@@ -2074,9 +2074,27 @@ export default function TournamentDetailPage() {
                       cursor: 'pointer',
                       fontWeight: 'bold',
                       fontSize: '16px',
+                      marginRight: '10px',
                     }}
                   >
                     予選順位表発表
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('finalTournament')
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                    }}
+                  >
+                    決勝トーナメント作成へ
                   </button>
                 </div>
               )}
@@ -2155,12 +2173,14 @@ export default function TournamentDetailPage() {
                           borderBottom: `1px solid ${isDark ? '#333' : '#e0e0e0'}`,
                         }}>
                           {rounds.map((round) => {
-                            const roundMatches = matches.filter(m => m.round === round)
+                            // 実際の対戦マッチのみをカウント（isTournamentMatch: true）
+                            const roundMatches = matches.filter(m => m.round === round && m.isTournamentMatch)
                             const roundCompleted = roundMatches.filter(m => m.result).length
                             const roundTotal = roundMatches.length
                             const isCurrentRound = round === selectedRound
                             const isActiveRound = round === tournament.currentRound
                             const isPastRound = round < (tournament.currentRound || 0)
+                            const isRoundCompleted = roundTotal > 0 && roundCompleted === roundTotal
 
                             return (
                               <button
@@ -2226,7 +2246,7 @@ export default function TournamentDetailPage() {
                                       {roundCompleted}/{roundTotal}
                                     </div>
                                   )}
-                                  {isActiveRound && (
+                                  {isActiveRound && !isRoundCompleted && (
                                     <div style={{ 
                                       fontSize: '9px',
                                       marginTop: '2px',
@@ -2235,11 +2255,12 @@ export default function TournamentDetailPage() {
                                       実施中
                                     </div>
                                   )}
-                                  {isPastRound && roundTotal > 0 && roundCompleted === roundTotal && (
+                                  {isRoundCompleted && (
                                     <div style={{ 
                                       fontSize: '9px',
                                       marginTop: '2px',
                                       opacity: 0.7,
+                                      color: isDark ? '#4CAF50' : '#2e7d32',
                                     }}>
                                       完了
                                     </div>
@@ -2861,8 +2882,8 @@ export default function TournamentDetailPage() {
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
           <h2 style={{ color: isDark ? '#fff' : '#333', marginBottom: '20px' }}>決勝トーナメント</h2>
           
-          {/* デバッグ情報（開発環境のみ） */}
-          {import.meta.env.DEV && (
+          {/* デバッグ情報 */}
+          {(
             <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: isDark ? '#333' : '#f0f0f0', borderRadius: '4px', fontSize: '12px' }}>
               <div><strong>決勝トーナメント作成ボタンの表示条件:</strong></div>
               <div>canEditTournament: {String(canEditTournament)}</div>
