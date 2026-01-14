@@ -2021,8 +2021,8 @@ export default function TournamentDetailPage() {
                         await announcePreliminaryStandings(id)
                         alert('予選順位表を発表しました')
                         await loadTournament()
-                        // 予選順位発表後は必ず完了状態になる
-                        setIsPreliminaryCompleted(true)
+                        // 予選順位発表後は必ず完了状態になる（バックエンドで未完了マッチを完了状態にしているため）
+                        // checkPreliminaryStatus()を呼んで最新の状態を取得
                         await checkPreliminaryStatus()
                       } catch (error: any) {
                         console.error('Announce preliminary standings error:', error)

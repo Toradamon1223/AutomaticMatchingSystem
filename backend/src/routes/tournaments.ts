@@ -2086,14 +2086,17 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     await calculateStandings(tournament.id)
 
     // 決勝トーナメントが作成されているかどうかをチェック（予選順位発表済みかどうかの判定）
-    const maxRound = await prisma.match.findFirst({
-      where: { tournamentId: req.params.id },
-      orderBy: { round: 'desc' },
-      select: { round: true },
+    // 決勝トーナメントマッチ（isTournamentMatch: true）が存在するかどうかで判定
+    const tournamentMatches = await prisma.match.findFirst({
+      where: {
+        tournamentId: req.params.id,
+        isTournamentMatch: true,
+      },
+      select: { id: true },
     })
 
     // 決勝トーナメントが作成されている場合、予選は完了している
-    const hasTournamentBracket = maxRound && maxRound.round > (tournament.currentRound || 0)
+    const hasTournamentBracket = !!tournamentMatches
 
     let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
     try {
