@@ -691,9 +691,6 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       ? opponentMWs.reduce((a, b) => a + b, 0) / opponentMWs.length
       : 0
 
-    // 勝手累点（ゲームウィン）は現在の実装ではwinsと同じ
-    const gameWins = wins
-
     return {
       participantId: participant.id,
       participant,
@@ -702,7 +699,6 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
       draws,
       points,
       omw,
-      gameWins,
       uniqueOpponents: Array.from(uniqueOpponents.keys()),
     }
   })
@@ -723,10 +719,64 @@ export async function calculateStandings(tournamentId: string): Promise<void> {
           draws: result.draws,
           points: result.points,
           omw: result.omw,
-          gameWins: result.gameWins,
         },
       })
     }
+  }
+
+  // 勝手累点を計算（自分が勝利した対戦相手の累計得点の合計）
+  // 全参加者のpointsを取得
+  const allParticipantsWithPoints = await prisma.participant.findMany({
+    where: {
+      tournamentId,
+      checkedIn: true,
+      dropped: false,
+      cancelledAt: null,
+    },
+    select: {
+      id: true,
+      points: true,
+    },
+  })
+
+  const pointsMap = new Map<string, number>()
+  for (const p of allParticipantsWithPoints) {
+    pointsMap.set(p.id, p.points || 0)
+  }
+
+  // 各参加者の勝手累点を計算
+  const gameWinsUpdatePromises = participants.map(async (participant) => {
+    // 自分が勝利したマッチを取得
+    const winsAsPlayer1 = participant.matchesAsPlayer1.filter(
+      (m) => m.player1Id !== m.player2Id && m.result === 'PLAYER1'
+    )
+    const winsAsPlayer2 = participant.matchesAsPlayer2.filter(
+      (m) => m.player1Id !== m.player2Id && m.result === 'PLAYER2'
+    )
+
+    // 勝利した対戦相手の累計得点の合計を計算
+    let gameWins = 0
+    for (const match of winsAsPlayer1) {
+      const opponentPoints = pointsMap.get(match.player2Id) || 0
+      gameWins += opponentPoints
+    }
+    for (const match of winsAsPlayer2) {
+      const opponentPoints = pointsMap.get(match.player1Id) || 0
+      gameWins += opponentPoints
+    }
+
+    return prisma.participant.update({
+      where: { id: participant.id },
+      data: {
+        gameWins,
+      },
+    })
+  })
+
+  // 勝手累点を更新
+  for (let i = 0; i < gameWinsUpdatePromises.length; i += batchSize) {
+    const batch = gameWinsUpdatePromises.slice(i, i + batchSize)
+    await Promise.all(batch)
   }
 
   // OOMW%を計算（対戦相手のOMW%の平均）
