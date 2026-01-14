@@ -966,6 +966,14 @@ router.get('/:id/matches', authenticate, async (req: AuthRequest, res) => {
 
       // 各プレイヤーの勝ち点を計算
       for (const prevMatch of previousMatches) {
+        // BYEマッチ（player1Id === player2Id）の処理
+        if (prevMatch.player1Id === prevMatch.player2Id) {
+          // BYEマッチの場合、player1が自動的に勝利（3点）
+          const current = pointsBeforeRoundMap.get(prevMatch.player1Id) || 0
+          pointsBeforeRoundMap.set(prevMatch.player1Id, current + 3)
+          continue
+        }
+
         const result = prevMatch.result?.toUpperCase()
         let player1Points = 0
         let player2Points = 0
