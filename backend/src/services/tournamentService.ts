@@ -127,12 +127,11 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   let matchNumber = 1
   let tableNumber = 1
 
-  // 勝敗数でグループ化（wins-losses形式）
-  const recordGroups = new Map<string, typeof participants>()
+  // 勝ち点でグループ化
+  const recordGroups = new Map<number, typeof participants>()
   for (const participant of participants) {
-    const wins = participant.wins || 0
-    const losses = participant.losses || 0
-    const record = `${wins}-${losses}`
+    const points = participant.points || 0
+    const record = Math.floor(points) // 勝ち点を整数に変換（小数点以下を切り捨て）
     if (!recordGroups.has(record)) {
       recordGroups.set(record, [])
     }
@@ -140,9 +139,9 @@ export async function generatePairings(tournamentId: string, round: number): Pro
   }
 
   // デバッグ: 各グループの人数をログ出力
-  console.log(`[generatePairings] Round ${round}: Record groups:`)
-  for (const [record, group] of recordGroups.entries()) {
-    console.log(`  ${record}: ${group.length} participants`)
+  console.log(`[generatePairings] Round ${round}: Point groups:`)
+  for (const [points, group] of Array.from(recordGroups.entries()).sort((a, b) => b[0] - a[0])) {
+    console.log(`  ${points} points: ${group.length} participants`)
     // 各グループの最初の数人の参加者IDとポイントをログ出力
     const sampleParticipants = group.slice(0, 3).map(p => ({
       id: p.id.substring(0, 8),
@@ -154,25 +153,17 @@ export async function generatePairings(tournamentId: string, round: number): Pro
     console.log(`    Sample:`, sampleParticipants)
   }
 
-  // 勝敗数の降順でソート（2-0 > 1-1 > 0-2 など）
-  const sortedRecords = Array.from(recordGroups.keys()).sort((a, b) => {
-    const [winsA, lossesA] = a.split('-').map(Number)
-    const [winsB, lossesB] = b.split('-').map(Number)
-    const pointsA = winsA - lossesA
-    const pointsB = winsB - lossesB
-    if (pointsA !== pointsB) return pointsB - pointsA
-    if (winsA !== winsB) return winsB - winsA
-    return lossesA - lossesB
-  })
+  // 勝ち点の降順でソート
+  const sortedRecords = Array.from(recordGroups.keys()).sort((a, b) => b - a)
 
   console.log(`[generatePairings] Round ${round}: Sorted records:`, sortedRecords)
 
-  // 各勝敗数グループでマッチング
+  // 各勝ち点グループでマッチング
   for (let recordIdx = 0; recordIdx < sortedRecords.length; recordIdx++) {
     const record = sortedRecords[recordIdx]
     let group = recordGroups.get(record)!.filter(p => !used.has(p.id))
     
-    console.log(`[generatePairings] Round ${round}: Processing record ${record}, ${group.length} participants (after filtering used)`)
+    console.log(`[generatePairings] Round ${round}: Processing ${record} points group, ${group.length} participants (after filtering used)`)
     
     // グループをシャッフル（ランダム化）
     for (let i = group.length - 1; i > 0; i--) {
@@ -180,7 +171,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
       [group[i], group[j]] = [group[j], group[i]]
     }
 
-    // 奇数人数の場合、次の勝敗数が高いグループに移動（下階段）
+    // 奇数人数の場合、次の勝ち点が低いグループに移動（下階段）
     if (group.length % 2 === 1 && recordIdx < sortedRecords.length - 1) {
       const nextRecord = sortedRecords[recordIdx + 1]
       const nextGroup = recordGroups.get(nextRecord)!.filter(p => !used.has(p.id))
@@ -191,16 +182,16 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         nextGroup.unshift(movedPlayer) // 先頭に追加
         recordGroups.set(nextRecord, nextGroup)
         // groupは空にならない（残りの偶数人数でマッチングを続ける）
-        console.log(`[generatePairings] Round ${round}: Record ${record} - Moved 1 player to ${nextRecord}, ${group.length} participants remaining`)
+        console.log(`[generatePairings] Round ${round}: ${record} points group - Moved 1 player to ${nextRecord} points group, ${group.length} participants remaining`)
       }
     }
 
-    // 同じ勝敗数グループ内でランダムにマッチング
+    // 同じ勝ち点グループ内でランダムにマッチング
     let matchesInThisGroup = 0
     while (group.length >= 2) {
       const player1 = group.shift()!
       if (used.has(player1.id)) {
-        console.log(`[generatePairings] Round ${round}: Record ${record} - Player ${player1.id} already used, skipping`)
+        console.log(`[generatePairings] Round ${round}: ${record} points group - Player ${player1.id} already used, skipping`)
         continue
       }
 
@@ -255,7 +246,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
         group.splice(i, 1) // マッチした相手をグループから削除
         paired = true
         matchesInThisGroup++
-        console.log(`[generatePairings] Round ${round}: Record ${record} - Paired ${player1.id} with ${player2.id}`)
+        console.log(`[generatePairings] Round ${round}: ${record} points group - Paired ${player1.id} with ${player2.id}`)
         break
       }
 
@@ -263,7 +254,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
       if (!paired) {
         let foundOpponent = false
         
-        // 次の勝敗数グループを探す
+        // 次の勝ち点グループを探す
         for (let nextIdx = recordIdx + 1; nextIdx < sortedRecords.length; nextIdx++) {
           const nextRecord = sortedRecords[nextIdx]
           const nextGroup = recordGroups.get(nextRecord)!.filter(p => !used.has(p.id))
@@ -314,7 +305,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
             recordGroups.set(nextRecord, nextGroup)
             foundOpponent = true
             matchesInThisGroup++
-            console.log(`[generatePairings] Round ${round}: Record ${record} - Paired ${player1.id} with ${opponent.id} from ${nextRecord}`)
+            console.log(`[generatePairings] Round ${round}: ${record} points group - Paired ${player1.id} with ${opponent.id} from ${nextRecord} points group`)
             break
           }
           
@@ -323,7 +314,7 @@ export async function generatePairings(tournamentId: string, round: number): Pro
 
         // それでもペアが見つからなかった場合（奇数人数）
         if (!foundOpponent) {
-          console.log(`[generatePairings] Round ${round}: Record ${record} - No opponent found for ${player1.id}, creating BYE match`)
+          console.log(`[generatePairings] Round ${round}: ${record} points group - No opponent found for ${player1.id}, creating BYE match`)
           // バイ（不戦勝）として扱う
           // バイの場合は、player2Idに自分自身を設定し、player2の名前を"BYE"として表示する
           // マッチレコードを作成して、試合数を正しくカウントできるようにする
@@ -380,14 +371,14 @@ export async function generatePairings(tournamentId: string, round: number): Pro
           // pairedがfalseで、foundOpponentがtrueの場合、player1は既にusedに追加されている
           // しかし、pairedがfalseのままなので、ここで確認
           if (!used.has(player1.id)) {
-            console.error(`[generatePairings] Round ${round}: Record ${record} - Player ${player1.id} was not added to used set after pairing!`)
+            console.error(`[generatePairings] Round ${round}: ${record} points group - Player ${player1.id} was not added to used set after pairing!`)
             used.add(player1.id)
           }
         }
       }
     }
     
-    console.log(`[generatePairings] Round ${round}: Record ${record} - Created ${matchesInThisGroup} matches, ${group.length} participants remaining`)
+    console.log(`[generatePairings] Round ${round}: ${record} points group - Created ${matchesInThisGroup} matches, ${group.length} participants remaining`)
 
     // グループが奇数人数で残った場合、最後の1人をBYEとして処理
     if (group.length === 1) {
