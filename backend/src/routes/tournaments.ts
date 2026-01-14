@@ -2060,7 +2060,11 @@ router.post('/:id/announce-preliminary-standings', authenticate, requireRole('or
       await calculateStandings(req.params.id)
     }
 
-    res.json({ message: '予選順位表を発表しました' })
+    // 予選順位発表済みフラグを設定（Tournamentモデルにフラグがないため、completedAtを設定して判定に使用）
+    // または、予選完了判定エンドポイントで予選順位発表済みかどうかをチェックする
+    // 現時点では、予選順位発表時点で予選が完了しているとみなす
+
+    res.json({ message: '予選順位表を発表しました', preliminaryAnnounced: true })
   } catch (error) {
     console.error('Announce preliminary standings error:', error)
     res.status(500).json({ message: '予選順位表の発表に失敗しました' })
@@ -2081,6 +2085,16 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     // 順位を再計算
     await calculateStandings(tournament.id)
 
+    // 決勝トーナメントが作成されているかどうかをチェック（予選順位発表済みかどうかの判定）
+    const maxRound = await prisma.match.findFirst({
+      where: { tournamentId: req.params.id },
+      orderBy: { round: 'desc' },
+      select: { round: true },
+    })
+
+    // 決勝トーナメントが作成されている場合、予選は完了している
+    const hasTournamentBracket = maxRound && maxRound.round > (tournament.currentRound || 0)
+
     let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
     try {
       const parsed = JSON.parse(tournament.preliminaryRounds)
@@ -2096,9 +2110,21 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     }
 
     let isCompleted = false
-    if (typeof preliminaryRounds === 'number') {
+    if (hasTournamentBracket) {
+      // 決勝トーナメントが作成されている場合、予選は完了している
+      isCompleted = true
+    } else if (typeof preliminaryRounds === 'number') {
       // 指定回戦数が完了しているか
-      isCompleted = tournament.currentRound >= preliminaryRounds
+      // 現在の回戦が指定回戦数以上で、かつ現在の回戦の全マッチが完了しているか
+      const currentRoundMatches = await prisma.match.findMany({
+        where: {
+          tournamentId: tournament.id,
+          round: tournament.currentRound || 0,
+        },
+      })
+      const completedMatches = currentRoundMatches.filter((m: any) => m.result !== null).length
+      const allMatchesCompleted = currentRoundMatches.length > 0 && completedMatches === currentRoundMatches.length
+      isCompleted = tournament.currentRound >= preliminaryRounds && allMatchesCompleted
     } else if (preliminaryRounds === 'until_one_undefeated') {
       // 全勝者が1人になるまで
       // 現在の回戦が完了していて、全勝者が1人かどうかを確認
