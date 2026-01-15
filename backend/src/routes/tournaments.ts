@@ -1221,28 +1221,21 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
     const round = updatedMatch.round
     ;(async () => {
       try {
-        // 予選の最大roundを取得
-        const maxPreliminaryRound = await prisma.match.findFirst({
-          where: { tournamentId: req.params.id },
-          orderBy: { round: 'desc' },
-          select: { round: true },
-        })
-        
-        // 決勝トーナメントのラウンドかどうかを判定（予選の最終roundより後のround）
-        const isTournamentRound = maxPreliminaryRound && round > maxPreliminaryRound.round
+        // 決勝トーナメントのラウンドかどうかを判定
+        const isTournamentRound = updatedMatch.isTournamentMatch
+
+        const matchFilter: any = {
+          tournamentId: req.params.id,
+          round,
+          isTournamentMatch: isTournamentRound,
+        }
 
         const totalMatchesInRound = await prisma.match.count({
-          where: {
-            tournamentId: req.params.id,
-            round,
-            isTournamentMatch: true, // 決勝トーナメントの場合はisTournamentMatch: trueのみ
-          },
+          where: matchFilter,
         })
         const completedMatchesInRound = await prisma.match.count({
           where: {
-            tournamentId: req.params.id,
-            round,
-            isTournamentMatch: true,
+            ...matchFilter,
             result: { not: null },
           },
         })
@@ -2293,22 +2286,11 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
       return res.status(404).json({ message: '大会が見つかりません' })
     }
 
-    // 予選の最大roundを取得
-    const maxRound = await prisma.match.findFirst({
-      where: { tournamentId: req.params.id },
-      orderBy: { round: 'desc' },
-      select: { round: true },
-    })
-
-    if (!maxRound) {
-      return res.json({ matches: [], rounds: [] })
-    }
-
-    // 決勝トーナメントのマッチを取得（予選の最終roundより後のround）
+    // 決勝トーナメントのマッチを取得（isTournamentMatch: true）
     const tournamentMatches = await prisma.match.findMany({
       where: {
         tournamentId: req.params.id,
-        round: { gt: maxRound.round },
+        isTournamentMatch: true,
       },
       include: {
         player1: {
@@ -2337,6 +2319,10 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
         { matchNumber: 'asc' },
       ],
     })
+
+    if (tournamentMatches.length === 0) {
+      return res.json({ matches: [], rounds: [] })
+    }
 
     // ラウンドごとにグループ化
     const roundsMap = new Map<number, any[]>()
