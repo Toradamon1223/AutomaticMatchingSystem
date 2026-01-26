@@ -2378,11 +2378,11 @@ router.delete('/:id/tournament-bracket', authenticate, requireRole('organizer', 
       return res.json({ message: '予選の回戦数が設定されていません' })
     }
 
-    // 決勝トーナメントのマッチを削除（予選の最終roundより後のround）
+    // 決勝トーナメントのマッチを削除（isTournamentMatch: true）
     const deletedMatches = await prisma.match.deleteMany({
       where: {
         tournamentId: req.params.id,
-        round: { gt: preliminaryRounds },
+        isTournamentMatch: true,
       },
     })
 
