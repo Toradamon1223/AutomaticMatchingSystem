@@ -31,7 +31,7 @@ chmod +x frontend/deploy-to-tournament.sh
 
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
-export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/api}"
+export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/Tournament/api}"
 
 # フロントエンドのビルド
 echo "フロントエンドをビルド中..."
@@ -56,7 +56,9 @@ cd backend
 npm install
 npm run build
 echo "バックエンドを再起動中..."
-pm2 restart tcg-backend || echo "警告: PM2の再起動に失敗しました（プロセスが存在しない可能性があります）"
+pm2 stop tcg-backend || echo "警告: PM2の停止に失敗しました（プロセスが存在しない可能性があります）"
+PORT=5001 pm2 start /var/www/Tournament/backend/dist/index.js --name tcg-backend
+pm2 save
 
 echo ""
 echo "✓ デプロイ完了！"
