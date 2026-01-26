@@ -77,7 +77,7 @@ function getTimeRemaining(targetDate: Date): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-type TabType = 'details' | 'participants' | 'tournament' | 'announcement'
+type TabType = 'details' | 'participants' | 'tournament' | 'finalTournament' | 'announcement'
 
 // 決勝トーナメントブラケット表示コンポーネント
 interface TournamentBracketDisplayProps {
@@ -495,7 +495,13 @@ export default function TournamentDetailPage() {
       if (canEdit) {
         checkPreliminaryStatus()
       }
-      // トーナメントタブでも決勝トーナメントデータを読み込む（ボタン表示用）
+    }
+
+    if (activeTab === 'finalTournament') {
+      // 予選完了判定をチェック（管理者/開催者のみ）
+      if (canEdit) {
+        checkPreliminaryStatus()
+      }
       const loadBracket = async () => {
         try {
           const bracket = await getTournamentBracket(id)
@@ -1152,6 +1158,7 @@ export default function TournamentDetailPage() {
           { id: 'details' as TabType, label: 'イベント詳細' },
           { id: 'participants' as TabType, label: '参加者' },
           { id: 'tournament' as TabType, label: 'トーナメント' },
+          { id: 'finalTournament' as TabType, label: '決勝トーナメント' },
           { id: 'announcement' as TabType, label: 'アナウンス' },
         ].map((tab) => (
           <button
@@ -2219,76 +2226,10 @@ export default function TournamentDetailPage() {
                       cursor: 'pointer',
                       fontWeight: 'bold',
                       fontSize: '16px',
-                      marginRight: '10px',
                     }}
                   >
                     予選順位表発表
                   </button>
-                  <button
-                    onClick={async () => {
-                      if (!id) return
-                      if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
-                      try {
-                        await resetTournamentBracket(id)
-                        alert('決勝トーナメントをリセットしました')
-                        setTournamentBracket(null)
-                        await loadTournament()
-                        // トーナメントタブの場合は、決勝トーナメントデータを再読み込み
-                        const bracket = await getTournamentBracket(id)
-                        setTournamentBracket(bracket)
-                      } catch (error: any) {
-                        console.error('Reset tournament bracket error:', error)
-                        const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
-                        alert(errorMessage)
-                      }
-                    }}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '16px',
-                      marginRight: '10px',
-                    }}
-                  >
-                    決勝トーナメントリセット
-                  </button>
-                  {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
-                    <button
-                      onClick={async () => {
-                        if (!id) return
-                        if (!confirm('決勝トーナメントを作成しますか？')) return
-                        try {
-                          setLoadingBracket(true)
-                          await createTournamentBracket(id)
-                          const bracket = await getTournamentBracket(id)
-                          setTournamentBracket(bracket)
-                          alert('決勝トーナメントを作成しました')
-                          // 決勝トーナメント作成後、自動で表示されるようにする
-                        } catch (error: any) {
-                          alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
-                        } finally {
-                          setLoadingBracket(false)
-                        }
-                      }}
-                      disabled={loadingBracket}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: loadingBracket ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                      }}
-                    >
-                      {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -3121,43 +3062,127 @@ export default function TournamentDetailPage() {
             </div>
           )}
 
-          {/* 決勝トーナメント表示 */}
-          {tournamentBracket && tournamentBracket.rounds.length > 0 && (
-            <div style={{ marginTop: '40px', padding: '20px 0' }}>
-              <h3 style={{ 
-                color: isDark ? '#fff' : '#333', 
-                marginBottom: '20px',
-                fontSize: '20px',
-                fontWeight: 'bold',
-                textAlign: 'center',
-              }}>
-                決勝トーナメント
-              </h3>
-              <TournamentBracketDisplay
-                bracket={tournamentBracket}
-                user={user}
-                isDark={isDark}
-                onWinnerSelect={async (matchId: string, winnerId: string) => {
-                  if (!id) return
-                  try {
-                    // 勝者を登録
-                    const match = tournamentBracket.matches.find(m => m.id === matchId)
-                    if (!match) return
-                    
-                    const result = match.player1Id === winnerId ? 'player1' : 'player2'
-                    await reportMatchResult(id, matchId, result)
-                    
-                    // ブラケットを再読み込み
-                    const updatedBracket = await getTournamentBracket(id)
-                    setTournamentBracket(updatedBracket)
-                    // マッチも再読み込み
-                    await loadMatches()
-                  } catch (error: any) {
-                    alert(error.response?.data?.message || '結果の登録に失敗しました')
-                  }
-                }}
-              />
+        </div>
+      )}
+
+      {/* 決勝トーナメントタブ */}
+      {activeTab === 'finalTournament' && (
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          {!isPreliminaryCompleted ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
+              <p>予選順位表の発表後に決勝トーナメントを作成できます</p>
             </div>
+          ) : (
+            <>
+              {canEditTournament && (
+                <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                  <button
+                    onClick={async () => {
+                      if (!id) return
+                      if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                      try {
+                        await resetTournamentBracket(id)
+                        alert('決勝トーナメントをリセットしました')
+                        setTournamentBracket(null)
+                        const bracket = await getTournamentBracket(id)
+                        setTournamentBracket(bracket)
+                      } catch (error: any) {
+                        console.error('Reset tournament bracket error:', error)
+                        const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                        alert(errorMessage)
+                      }
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      marginRight: '10px',
+                    }}
+                  >
+                    決勝トーナメントリセット
+                  </button>
+                  {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
+                    <button
+                      onClick={async () => {
+                        if (!id) return
+                        if (!confirm('決勝トーナメントを作成しますか？')) return
+                        try {
+                          setLoadingBracket(true)
+                          await createTournamentBracket(id)
+                          const bracket = await getTournamentBracket(id)
+                          setTournamentBracket(bracket)
+                          alert('決勝トーナメントを作成しました')
+                        } catch (error: any) {
+                          alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
+                        } finally {
+                          setLoadingBracket(false)
+                        }
+                      }}
+                      disabled={loadingBracket}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: loadingBracket ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                      }}
+                    >
+                      {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {tournamentBracket && tournamentBracket.rounds.length > 0 ? (
+                <div style={{ marginTop: '20px', padding: '20px 0' }}>
+                  <h3 style={{ 
+                    color: isDark ? '#fff' : '#333', 
+                    marginBottom: '20px',
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                  }}>
+                    決勝トーナメント
+                  </h3>
+                  <TournamentBracketDisplay
+                    bracket={tournamentBracket}
+                    user={user}
+                    isDark={isDark}
+                    onWinnerSelect={async (matchId: string, winnerId: string) => {
+                      if (!id) return
+                      try {
+                        // 勝者を登録
+                        const match = tournamentBracket.matches.find(m => m.id === matchId)
+                        if (!match) return
+                        
+                        const result = match.player1Id === winnerId ? 'player1' : 'player2'
+                        await reportMatchResult(id, matchId, result)
+                        
+                        // ブラケットを再読み込み
+                        const updatedBracket = await getTournamentBracket(id)
+                        setTournamentBracket(updatedBracket)
+                        // マッチも再読み込み
+                        await loadMatches()
+                      } catch (error: any) {
+                        alert(error.response?.data?.message || '結果の登録に失敗しました')
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
+                  <p>決勝トーナメントはまだ作成されていません</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
