@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "restart:with-prisma": "node scripts/restart-with-prisma.js"
+    "restart:with-prisma": "node scripts/restart-with-prisma.js",
+    "db:keepalive": "node scripts/keepalive-db.js"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",
