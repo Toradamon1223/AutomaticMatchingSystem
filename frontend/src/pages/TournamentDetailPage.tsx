@@ -88,6 +88,10 @@ interface TournamentBracketDisplayProps {
 }
 
 function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: TournamentBracketDisplayProps) {
+  const defaultLineColor = isDark ? '#666' : '#333'
+  const winnerLineColor = '#e53935'
+  const getMatchLineColor = (match: Match) => (match.result ? winnerLineColor : defaultLineColor)
+
   const handlePlayerClick = async (match: Match, playerId: string) => {
     // 既に結果が登録されている場合は何もしない
     if (match.result) return
@@ -172,7 +176,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                         y1={currentY}
                         x2={roundGap / 2}
                         y2={currentY}
-                        stroke={isDark ? '#666' : '#333'}
+                        stroke={getMatchLineColor(match)}
                         strokeWidth="2"
                       />
                     </g>
@@ -199,7 +203,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={startY}
                           x2={roundGap / 2}
                           y2={endY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                         {/* 水平線（次のラウンドへ） */}
@@ -208,7 +212,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={nextY}
                           x2={roundGap}
                           y2={nextY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                         {/* 中央の垂直線（結合点から次のラウンドへ） */}
@@ -217,7 +221,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={centerY}
                           x2={roundGap / 2}
                           y2={nextY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                       </g>
@@ -1873,6 +1877,16 @@ export default function TournamentDetailPage() {
             >
               参加者一覧 ({participants.length}
               {entryStatus?.tournament.capacity ? `/${entryStatus.tournament.capacity}` : ''}名)
+              <span
+                style={{
+                  marginLeft: '12px',
+                  fontSize: '14px',
+                  color: isDark ? '#aaa' : '#666',
+                  fontWeight: 'normal',
+                }}
+              >
+                チェックイン済み: {getCheckedInCount()}名
+              </span>
             </h2>
             {/* ゲストユーザー追加ボタン（管理者または主催者のみ、受付時間外でも可能） */}
             {canEditTournament && (

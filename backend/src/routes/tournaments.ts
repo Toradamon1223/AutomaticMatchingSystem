@@ -1621,6 +1621,22 @@ router.post('/:id/rounds/:round/start', authenticate, requireRole('organizer', '
       return res.status(400).json({ message: '大会が開始されていません' })
     }
 
+    // 第1回戦のマッチング発表時、チェックイン未完了の参加者を除外
+    if (round === 1) {
+      await prisma.participant.updateMany({
+        where: {
+          tournamentId: req.params.id,
+          checkedIn: false,
+          cancelledAt: null,
+        },
+        data: {
+          cancelledAt: new Date(),
+          checkedIn: false,
+          checkedInAt: null,
+        },
+      })
+    }
+
     // プレビュー用の対戦表を有効化（isTournamentMatch: trueに更新）
     const updatedMatches = await prisma.match.updateMany({
       where: {
