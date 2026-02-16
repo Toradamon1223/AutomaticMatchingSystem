@@ -1373,6 +1373,20 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
       return res.status(400).json({ message: 'チェックイン済みの参加者が2名未満です' })
     }
 
+    // 第1回戦マッチング作成時、チェックイン未完了の参加者を除外
+    await prisma.participant.updateMany({
+      where: {
+        tournamentId: req.params.id,
+        checkedIn: false,
+        cancelledAt: null,
+      },
+      data: {
+        cancelledAt: new Date(),
+        checkedIn: false,
+        checkedInAt: null,
+      },
+    })
+
     // 予選回戦数と予選終了条件のバリデーション
     if (preliminaryRounds === undefined || preliminaryRounds === null) {
       return res.status(400).json({ message: '予選回戦数または予選終了条件を指定してください' })
@@ -1689,6 +1703,22 @@ router.post('/:id/start-matches', authenticate, requireRole('organizer', 'admin'
 
     if (tournament.status !== 'IN_PROGRESS') {
       return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // 第1回戦の公開時、チェックイン未完了の参加者を除外
+    if ((tournament.currentRound || 0) === 1) {
+      await prisma.participant.updateMany({
+        where: {
+          tournamentId: req.params.id,
+          checkedIn: false,
+          cancelledAt: null,
+        },
+        data: {
+          cancelledAt: new Date(),
+          checkedIn: false,
+          checkedInAt: null,
+        },
+      })
     }
 
     // 対戦表を公開
