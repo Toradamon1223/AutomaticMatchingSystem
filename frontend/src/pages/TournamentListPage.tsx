@@ -73,7 +73,12 @@ export default function TournamentListPage() {
     if (myEntry.cancelledAt) {
       return '未エントリー'
     }
-    if (myEntry.isWaitlist) {
+    if (
+      myEntry.isWaitlist &&
+      (tournament.status === 'registration' ||
+        tournament.status === 'preparing' ||
+        tournament.status === 'draft')
+    ) {
       return 'キャンセル待ち'
     }
     return 'エントリー済み'
@@ -87,7 +92,12 @@ export default function TournamentListPage() {
     if (!myEntry || myEntry.cancelledAt) {
       return '#f44336' // 赤: 未エントリー
     }
-    if (myEntry.isWaitlist) {
+    if (
+      myEntry.isWaitlist &&
+      (tournament.status === 'registration' ||
+        tournament.status === 'preparing' ||
+        tournament.status === 'draft')
+    ) {
       return '#FF9800' // オレンジ: キャンセル待ち
     }
     return '#2196F3' // 青: エントリー済み
