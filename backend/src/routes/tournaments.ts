@@ -297,9 +297,14 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
       ? now >= tournament.entryStartAt && now <= tournament.entryEndAt
       : false
 
-    // 定員内の参加者数
-    const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
-    const waitlistCount = tournament.participants.filter((p: any) => p.isWaitlist).length
+    // 定員内/キャンセル待ちを再計算（エントリー順）
+    const maxParticipants = tournament.capacity || 0
+    const recalculatedParticipants = tournament.participants.map((p: any, index: number) => ({
+      ...p,
+      isWaitlist: maxParticipants > 0 && index >= maxParticipants,
+    }))
+    const confirmedCount = recalculatedParticipants.filter((p: any) => !p.isWaitlist).length
+    const waitlistCount = recalculatedParticipants.filter((p: any) => p.isWaitlist).length
     
     // デバッグ用（本番では削除可能）
     console.log('Entry status calculation:', {
@@ -317,7 +322,7 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
     })
 
     // 現在のユーザーのエントリー状況
-    const myEntry = tournament.participants.find((p: any) => p.userId === req.userId!)
+    const myEntry = recalculatedParticipants.find((p: any) => p.userId === req.userId!)
 
     res.json({
       tournament: transformTournament(tournament),
