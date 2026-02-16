@@ -873,15 +873,15 @@ router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, re
     const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
-    // 参加者として追加（エントリー済みだが、チェックインは未チェック）
+    // 参加者として追加（ゲストは即チェックイン）
     const participant = await prisma.participant.create({
       data: {
         tournamentId: req.params.id,
         userId: guestUser.id,
         enteredAt: getJSTNow(),
         isWaitlist,
-        checkedIn: false, // ゲストユーザーも他のユーザーと同じく手動でチェックイン
-        checkedInAt: null,
+        checkedIn: true,
+        checkedInAt: getJSTNow(),
       },
       include: {
         user: {
