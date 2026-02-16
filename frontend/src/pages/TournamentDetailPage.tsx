@@ -28,6 +28,7 @@ import {
   createTournamentBracket,
   getTournamentBracket,
   resetTournamentBracket,
+  uploadTournamentLogo,
   TournamentBracket,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
@@ -75,6 +76,16 @@ function getTimeRemaining(targetDate: Date): string {
   const seconds = Math.floor((diff % (1000 * 60)) / 1000)
 
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function resolveLogoUrl(url?: string): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/tournaments/')) {
+    const apiBase = import.meta.env.VITE_API_URL || '/Tournament/api'
+    return `${apiBase}${url}`
+  }
+  return url
 }
 
 type TabType = 'details' | 'participants' | 'tournament' | 'finalTournament' | 'announcement'
@@ -418,6 +429,7 @@ export default function TournamentDetailPage() {
     description: string
     logoImageUrl: string
     entryFee: number | null
+    tournamentSize: 4 | 8 | 16 | 32
     venueName: string
     venueAddress: string
     eventDate: string
@@ -435,6 +447,7 @@ export default function TournamentDetailPage() {
   const [showGuestForm, setShowGuestForm] = useState(false)
   const [guestPlayerName, setGuestPlayerName] = useState('')
   const [addingGuest, setAddingGuest] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [showTournamentCreateForm, setShowTournamentCreateForm] = useState(false)
   const [preliminaryRoundsType, setPreliminaryRoundsType] = useState<'number' | 'until_one_undefeated' | 'until_two_undefeated'>('number')
   const [preliminaryRoundsNumber, setPreliminaryRoundsNumber] = useState<number>(3)
@@ -782,6 +795,7 @@ export default function TournamentDetailPage() {
       description: tournament.description || '',
       logoImageUrl: (tournament as any).logoImageUrl || '',
       entryFee: (tournament as any).entryFee ?? null,
+      tournamentSize: (tournament.tournamentSize as 4 | 8 | 16 | 32) || 8,
       venueName: (tournament as any).venueName || '',
       venueAddress: (tournament as any).venueAddress || '',
       eventDate: tournament.eventDate || '',
@@ -794,6 +808,7 @@ export default function TournamentDetailPage() {
       isPublic: (tournament as any).isPublic !== undefined ? (tournament as any).isPublic : true,
     })
     setIsEditing(true)
+    setLogoFile(null)
   }
 
   // 開催日を設定したら、時間の日付部分を自動設定
@@ -843,17 +858,22 @@ export default function TournamentDetailPage() {
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditingData(null)
+    setLogoFile(null)
   }
 
   const handleSaveTournament = async () => {
     if (!id || !editingData) return
     setSaving(true)
     try {
+      if (logoFile) {
+        await uploadTournamentLogo(id, logoFile)
+      }
       const updated = await updateTournament(id, {
         name: editingData.name,
         description: editingData.description || undefined,
-        logoImageUrl: editingData.logoImageUrl || undefined,
+        logoImageUrl: logoFile ? undefined : editingData.logoImageUrl || undefined,
         entryFee: editingData.entryFee ?? undefined,
+        tournamentSize: editingData.tournamentSize,
         venueName: editingData.venueName || undefined,
         venueAddress: editingData.venueAddress || undefined,
         eventDate: editingData.eventDate || undefined,
@@ -868,6 +888,7 @@ export default function TournamentDetailPage() {
       setTournament(updated)
       setIsEditing(false)
       setEditingData(null)
+      setLogoFile(null)
       alert('大会情報を更新しました')
     } catch (error: any) {
       alert(error.response?.data?.message || '大会情報の更新に失敗しました')
@@ -1428,12 +1449,12 @@ export default function TournamentDetailPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                  ロゴ画像URL
+                  ロゴ画像
                 </label>
                 <input
-                  type="text"
-                  value={editingData.logoImageUrl}
-                  onChange={(e) => setEditingData({ ...editingData, logoImageUrl: e.target.value })}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -1444,6 +1465,9 @@ export default function TournamentDetailPage() {
                     fontSize: '16px',
                   }}
                 />
+                <div style={{ marginTop: '6px', fontSize: '12px', color: isDark ? '#aaa' : '#666' }}>
+                  {logoFile ? `選択中: ${logoFile.name}` : editingData.logoImageUrl ? '現在の画像を使用中' : '未設定'}
+                </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
@@ -1601,6 +1625,30 @@ export default function TournamentDetailPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
+                  決勝トーナメント進出人数
+                </label>
+                <select
+                  value={editingData.tournamentSize}
+                  onChange={(e) => setEditingData({ ...editingData, tournamentSize: parseInt(e.target.value, 10) as 4 | 8 | 16 | 32 })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: isDark ? '1px solid #444' : '1px solid #ddd',
+                    backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                    color: isDark ? '#fff' : '#333',
+                    fontSize: '16px',
+                  }}
+                >
+                  <option value={4}>4人</option>
+                  <option value={8}>8人</option>
+                  <option value={16}>16人</option>
+                  <option value={32}>32人</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
                   定員
                 </label>
                 <input
@@ -1677,13 +1725,13 @@ export default function TournamentDetailPage() {
           ) : (
             <>
               {/* ロゴ画像 */}
-              {(tournament as any).logoImageUrl && (
+              {resolveLogoUrl((tournament as any).logoImageUrl) && (
                 <div
                   style={{
                     width: '100%',
                     height: '300px',
                     backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
-                    backgroundImage: `url(${(tournament as any).logoImageUrl})`,
+                    backgroundImage: `url(${resolveLogoUrl((tournament as any).logoImageUrl)})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',

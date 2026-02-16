@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createTournament } from '../api/tournaments'
+import { createTournament, uploadTournamentLogo } from '../api/tournaments'
 import BackButton from '../components/BackButton'
 import VenueAutocomplete from '../components/VenueAutocomplete'
 import { combineDateAndTime } from '../utils/dateUtils'
@@ -9,7 +9,7 @@ export default function CreateTournamentPage() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [logoImageUrl, setLogoImageUrl] = useState('')
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [entryFee, setEntryFee] = useState('')
   const [preliminaryRounds, setPreliminaryRounds] = useState<
     number | 'until_one_undefeated' | 'until_two_undefeated'
@@ -56,7 +56,6 @@ export default function CreateTournamentPage() {
       const tournament = await createTournament({
         name,
         description,
-        logoImageUrl: logoImageUrl || undefined,
         entryFee: entryFee ? parseInt(entryFee) : undefined,
         preliminaryRounds,
         tournamentSize,
@@ -71,6 +70,9 @@ export default function CreateTournamentPage() {
         venueAddress: venueAddress || undefined,
         isPublic,
       })
+      if (logoFile) {
+        await uploadTournamentLogo(tournament.id, logoFile)
+      }
       navigate(`/tournaments/${tournament.id}/admin`)
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || err.message || '大会の作成に失敗しました'
@@ -114,12 +116,11 @@ export default function CreateTournamentPage() {
 
         <div style={{ marginBottom: '15px' }}>
           <label>
-            ロゴ画像URL
+            ロゴ画像
             <input
-              type="url"
-              value={logoImageUrl}
-              onChange={(e) => setLogoImageUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
               style={{ width: '100%', padding: '8px', marginTop: '5px' }}
             />
           </label>

@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     name: string
     role: string
   }
+  file?: any
 }
 
 export const authenticate = async (

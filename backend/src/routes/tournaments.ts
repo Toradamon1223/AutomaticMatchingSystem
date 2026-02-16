@@ -6,8 +6,13 @@ import { transformTournament, transformMatch } from '../utils/tournamentTransfor
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 import QRCode from 'qrcode'
 import bcrypt from 'bcryptjs'
+import multer from 'multer'
 
 const router = express.Router()
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+})
 
 // 大会一覧取得
 router.get('/', authenticate, async (req: AuthRequest, res) => {
@@ -151,6 +156,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
       description,
       logoImageUrl,
       entryFee,
+      tournamentSize,
       venueName,
       venueAddress,
       eventDate,
@@ -168,6 +174,15 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
     if (description !== undefined) updateData.description = description
     if (logoImageUrl !== undefined) updateData.logoImageUrl = logoImageUrl
     if (entryFee !== undefined) updateData.entryFee = entryFee
+    if (tournamentSize !== undefined) {
+      if (![4, 8, 16, 32].includes(tournamentSize)) {
+        return res.status(400).json({ message: 'トーナメントサイズは4, 8, 16, 32のいずれかである必要があります' })
+      }
+      if (tournament.status === 'IN_PROGRESS') {
+        return res.status(400).json({ message: '大会進行中は決勝トーナメント進出人数を変更できません' })
+      }
+      updateData.tournamentSize = tournamentSize
+    }
     if (venueName !== undefined) updateData.venueName = venueName
     if (venueAddress !== undefined) updateData.venueAddress = venueAddress
     if (eventDate !== undefined) updateData.eventDate = eventDate ? parseJSTISOString(eventDate) : null
@@ -898,6 +913,69 @@ router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, re
   } catch (error) {
     console.error('Add guest user error:', error)
     res.status(500).json({ message: 'ゲストユーザーの追加に失敗しました' })
+  }
+})
+
+// ロゴ画像アップロード（管理者または主催者のみ）
+router.post('/:id/logo', authenticate, requireRole('organizer', 'admin'), upload.single('logo'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: '画像ファイルを選択してください' })
+    }
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: '対応していない画像形式です（png/jpg/webp/gif）' })
+    }
+
+    await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: {
+        logoImageData: req.file.buffer,
+        logoImageMimeType: req.file.mimetype,
+        logoImageUrl: null,
+      } as any,
+    })
+
+    res.json({ logoImageUrl: `/tournaments/${req.params.id}/logo` })
+  } catch (error) {
+    console.error('Upload logo error:', error)
+    res.status(500).json({ message: 'ロゴ画像のアップロードに失敗しました' })
+  }
+})
+
+// ロゴ画像取得
+router.get('/:id/logo', async (req, res) => {
+  try {
+    const tournament = (await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      select: {
+        logoImageData: true,
+        logoImageMimeType: true,
+      } as any,
+    })) as any
+
+    if (!tournament || !tournament.logoImageData) {
+      return res.status(404).send('Not Found')
+    }
+
+    res.setHeader('Content-Type', tournament.logoImageMimeType || 'application/octet-stream')
+    res.send(Buffer.from(tournament.logoImageData))
+  } catch (error) {
+    console.error('Get logo error:', error)
+    res.status(500).send('Error')
   }
 })
 

@@ -4,6 +4,16 @@ import { Tournament } from '../types'
 import { getTournaments, getEntryStatus } from '../api/tournaments'
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 
+function resolveLogoUrl(url?: string): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/tournaments/')) {
+    const apiBase = import.meta.env.VITE_API_URL || '/Tournament/api'
+    return `${apiBase}${url}`
+  }
+  return url
+}
+
 interface TournamentWithEntryStatus extends Tournament {
   entryStatus?: {
     isEntryPeriod: boolean
@@ -202,7 +212,7 @@ export default function TournamentListPage() {
                     width: '100%',
                     height: '180px',
                     backgroundColor: '#f5f5f5',
-                    backgroundImage: tournament.logoImageUrl ? `url(${tournament.logoImageUrl})` : 'none',
+                    backgroundImage: resolveLogoUrl(tournament.logoImageUrl) ? `url(${resolveLogoUrl(tournament.logoImageUrl)})` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
