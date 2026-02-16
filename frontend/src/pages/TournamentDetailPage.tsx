@@ -676,6 +676,17 @@ export default function TournamentDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (!tournament || matches.length === 0) return
+    const availableRounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b)
+    if (!availableRounds.includes(selectedRound)) {
+      const fallbackRound = availableRounds.includes(tournament.currentRound || 0)
+        ? (tournament.currentRound as number)
+        : availableRounds[0]
+      setSelectedRound(fallbackRound)
+    }
+  }, [matches, selectedRound, tournament])
+
   const loadStandings = async () => {
     if (!id) return
     try {
@@ -2386,6 +2397,8 @@ export default function TournamentDetailPage() {
                           {rounds.map((round) => {
                             // 実際の対戦マッチのみをカウント（isTournamentMatch: true）
                             const roundMatches = matches.filter(m => m.round === round && m.isTournamentMatch)
+                            const roundMatchCount = matches.filter(m => m.round === round).length
+                            const isSelectable = roundMatchCount > 0
                             // resultがnullでないことを確認
                             const roundCompleted = roundMatches.filter(m => m.result != null).length
                             const roundTotal = roundMatches.length
@@ -2406,16 +2419,21 @@ export default function TournamentDetailPage() {
                               <button
                                 key={round}
                                 onClick={() => {
+                                  if (!isSelectable) return
                                   setSelectedRound(round)
                                   // ラウンド選択時は、すべてのラウンドのマッチを読み込む（既に読み込まれている場合は更新のみ）
                                   loadMatches()
                                 }}
                                 style={{
                                   padding: isMobile ? '8px 16px' : '10px 20px',
-                                  backgroundColor: isCurrentRound 
+                                  backgroundColor: !isSelectable
+                                    ? (isDark ? '#2a2a2a' : '#f0f0f0')
+                                    : isCurrentRound 
                                     ? (isRoundCompleted ? (isDark ? '#333' : '#e0e0e0') : (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3')))
                                     : (isActiveRound && !isRoundCompleted ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
-                                  color: isCurrentRound 
+                                  color: !isSelectable
+                                    ? (isDark ? '#777' : '#999')
+                                    : isCurrentRound 
                                     ? (isRoundCompleted ? (isDark ? '#fff' : '#333') : 'white')
                                     : (isActiveRound && !isRoundCompleted
                                         ? (isDark ? '#4CAF50' : '#2e7d32')
@@ -2423,14 +2441,16 @@ export default function TournamentDetailPage() {
                                             ? (isDark ? '#888' : '#999')
                                             : (isDark ? '#fff' : '#333'))),
                                   border: `2px solid ${
-                                    isCurrentRound 
+                                    !isSelectable
+                                      ? (isDark ? '#333' : '#ddd')
+                                      : isCurrentRound 
                                       ? (isRoundCompleted ? '#2196F3' : (isActiveRound ? '#4CAF50' : '#2196F3'))
                                       : (isActiveRound && !isRoundCompleted
                                           ? (isDark ? '#4CAF50' : '#4CAF50')
                                           : (isDark ? '#444' : '#ddd'))
                                   }`,
                                   borderRadius: '8px',
-                                  cursor: 'pointer',
+                                  cursor: isSelectable ? 'pointer' : 'not-allowed',
                                   fontWeight: isCurrentRound ? 'bold' : (isActiveRound ? '600' : 'normal'),
                                   fontSize: isMobile ? '13px' : '14px',
                                   transition: 'all 0.2s',
@@ -2438,13 +2458,13 @@ export default function TournamentDetailPage() {
                                   position: 'relative',
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (!isCurrentRound) {
+                                  if (!isCurrentRound && isSelectable) {
                                     e.currentTarget.style.transform = 'translateY(-2px)'
                                     e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
                                   }
                                 }}
                                 onMouseLeave={(e) => {
-                                  if (!isCurrentRound) {
+                                  if (!isCurrentRound && isSelectable) {
                                     e.currentTarget.style.transform = 'translateY(0)'
                                     e.currentTarget.style.boxShadow = 'none'
                                   }
@@ -2475,7 +2495,7 @@ export default function TournamentDetailPage() {
                                       opacity: 0.6,
                                       color: isDark ? '#888' : '#999',
                                     }}>
-                                      {isRoundCompleted ? '✓完了' : (isActiveRound ? '進行中' : '未開始')}
+                                      {isRoundCompleted ? '✓完了' : (isActiveRound ? '進行中' : (isSelectable ? '未開始' : ''))}
                                     </div>
                                   )}
                                   {isRoundCompleted ? (
