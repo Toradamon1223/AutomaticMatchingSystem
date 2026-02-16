@@ -1839,6 +1839,23 @@ export default function TournamentDetailPage() {
                 </span>
               </div>
             )}
+
+            {/* 決勝トーナメント進出人数 */}
+            {tournament.tournamentSize && (
+              <div
+                style={{
+                  marginBottom: '15px',
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: isDark ? '#fff' : '#333',
+                }}
+              >
+                <span>🏆</span>
+                <span>決勝トーナメント進出人数: {tournament.tournamentSize}人</span>
+              </div>
+            )}
                 </div>
               )}
 
@@ -3134,6 +3151,24 @@ export default function TournamentDetailPage() {
       {/* 決勝トーナメントタブ */}
       {activeTab === 'finalTournament' && (
         <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          {tournament.tournamentSize && (
+            <div
+              style={{
+                marginBottom: '15px',
+                padding: '10px 12px',
+                border: `1px solid ${isDark ? '#333' : '#ddd'}`,
+                borderRadius: '8px',
+                color: isDark ? '#fff' : '#333',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDark ? '#1a1a1a' : '#fafafa',
+              }}
+            >
+              <span>🏆</span>
+              <span>決勝トーナメント進出人数: {tournament.tournamentSize}人</span>
+            </div>
+          )}
           {!isPreliminaryCompleted ? (
             <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
               <p>予選順位表の発表後に決勝トーナメントを作成できます</p>
