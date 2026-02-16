@@ -2154,11 +2154,13 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     await calculateStandings(tournament.id)
 
     // 決勝トーナメントが作成されているかどうかをチェック（予選順位発表済みかどうかの判定）
-    // 決勝トーナメントマッチ（isTournamentMatch: true）が存在するかどうかで判定
+    // 予選の最大回戦数より後のラウンドのみを決勝トーナメントとして扱う
+    const finalBracketMinRound = (tournament.maxRounds || 0) + 1
     const tournamentMatches = await prisma.match.findFirst({
       where: {
         tournamentId: req.params.id,
         isTournamentMatch: true,
+        round: { gte: finalBracketMinRound },
       },
       select: { id: true },
     })
@@ -2332,11 +2334,12 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
       return res.status(404).json({ message: '大会が見つかりません' })
     }
 
-    // 決勝トーナメントのマッチを取得（isTournamentMatch: true）
+    // 決勝トーナメントのマッチを取得（予選の最大回戦数より後のラウンドのみ）
     const tournamentMatches = await prisma.match.findMany({
       where: {
         tournamentId: req.params.id,
         isTournamentMatch: true,
+        round: { gte: (tournament.maxRounds || 0) + 1 },
       },
       include: {
         player1: {
@@ -2424,11 +2427,12 @@ router.delete('/:id/tournament-bracket', authenticate, requireRole('organizer', 
       return res.json({ message: '予選の回戦数が設定されていません' })
     }
 
-    // 決勝トーナメントのマッチを削除（isTournamentMatch: true）
+    // 決勝トーナメントのマッチを削除（予選の最大回戦数より後のラウンドのみ）
     const deletedMatches = await prisma.match.deleteMany({
       where: {
         tournamentId: req.params.id,
         isTournamentMatch: true,
+        round: { gte: (tournament.maxRounds || 0) + 1 },
       },
     })
 
