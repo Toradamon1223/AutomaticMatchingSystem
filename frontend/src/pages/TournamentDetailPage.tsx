@@ -965,6 +965,156 @@ export default function TournamentDetailPage() {
     }
   }
 
+  const renderTournamentCreatePanel = () => {
+    const canShow =
+      canEditTournament &&
+      (tournament?.status === 'registration' ||
+        tournament?.status === 'draft' ||
+        (tournament?.status as string) === 'preparing') &&
+      isAfterRegistrationEnd()
+
+    if (!canShow) return null
+
+    return (
+      <div
+        style={{
+          marginBottom: '30px',
+          padding: '15px',
+          border: `1px solid ${isDark ? '#333' : '#ccc'}`,
+          borderRadius: '8px',
+          backgroundColor: isDark ? '#1a1a1a' : '#fff',
+        }}
+      >
+        <h3 style={{ color: isDark ? '#fff' : '#333', marginBottom: '15px' }}>マッチング作成</h3>
+        {!showTournamentCreateForm ? (
+          <div>
+            <p style={{ color: isDark ? '#aaa' : '#666', marginBottom: '15px' }}>
+              チェックイン済み: {getCheckedInCount()}名
+              {getCheckedInCount() < 2 && (
+                <span style={{ color: '#f44336', marginLeft: '10px' }}>(2名以上必要)</span>
+              )}
+            </p>
+            <button
+              onClick={() => setShowTournamentCreateForm(true)}
+              disabled={getCheckedInCount() < 2}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: getCheckedInCount() < 2 ? '#ccc' : '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+              }}
+            >
+              マッチングを作成
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: '15px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '5px',
+                  color: isDark ? '#fff' : '#333',
+                  fontWeight: 'bold',
+                }}
+              >
+                対戦表終了条件
+              </label>
+              <select
+                value={preliminaryRoundsType}
+                onChange={(e) =>
+                  setPreliminaryRoundsType(
+                    e.target.value as 'number' | 'until_one_undefeated' | 'until_two_undefeated'
+                  )
+                }
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  border: isDark ? '1px solid #444' : '1px solid #ddd',
+                  backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                  color: isDark ? '#fff' : '#333',
+                  fontSize: '14px',
+                }}
+              >
+                <option value="number">指定回戦数</option>
+                <option value="until_one_undefeated">無敗が1人になるまで</option>
+                <option value="until_two_undefeated">無敗が2人になるまで</option>
+              </select>
+            </div>
+            {preliminaryRoundsType === 'number' && (
+              <div style={{ marginBottom: '15px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: isDark ? '#fff' : '#333',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  対戦表回戦数
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={preliminaryRoundsNumber}
+                  onChange={(e) => setPreliminaryRoundsNumber(parseInt(e.target.value) || 1)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '6px',
+                    border: isDark ? '1px solid #444' : '1px solid #ddd',
+                    backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                    color: isDark ? '#fff' : '#333',
+                    fontSize: '14px',
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleCreateTournament}
+                disabled={creatingTournament || getCheckedInCount() < 2}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: creatingTournament || getCheckedInCount() < 2 ? '#ccc' : '#4caf50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: creatingTournament || getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {creatingTournament ? '作成中...' : '作成'}
+              </button>
+              <button
+                onClick={() => setShowTournamentCreateForm(false)}
+                disabled={creatingTournament}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: isDark ? '#444' : '#f5f5f5',
+                  color: isDark ? '#fff' : '#333',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: creatingTournament ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const handleToggleCheckIn = async (participantId: string) => {
     if (!id) return
     setCheckingInParticipants((prev) => new Set(prev).add(participantId))
@@ -1692,128 +1842,7 @@ export default function TournamentDetailPage() {
               <div>現在時刻: {getJSTNow().toISOString()}</div>
             </div>
           )}
-          {canEditTournament && (tournament.status === 'registration' || tournament.status === 'draft' || (tournament.status as string) === 'preparing') && isAfterRegistrationEnd() && (
-            <div
-              style={{
-                marginBottom: '30px',
-                padding: '15px',
-                border: `1px solid ${isDark ? '#333' : '#ccc'}`,
-                borderRadius: '8px',
-                backgroundColor: isDark ? '#1a1a1a' : '#fff',
-              }}
-            >
-              <h3 style={{ color: isDark ? '#fff' : '#333', marginBottom: '15px' }}>マッチング作成</h3>
-              {!showTournamentCreateForm ? (
-                <div>
-                  <p style={{ color: isDark ? '#aaa' : '#666', marginBottom: '15px' }}>
-                    チェックイン済み: {getCheckedInCount()}名
-                    {getCheckedInCount() < 2 && (
-                      <span style={{ color: '#f44336', marginLeft: '10px' }}>
-                        (2名以上必要)
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    onClick={() => setShowTournamentCreateForm(true)}
-                    disabled={getCheckedInCount() < 2}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: getCheckedInCount() < 2 ? '#ccc' : '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    マッチングを作成
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ marginBottom: '15px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                      対戦表終了条件
-                    </label>
-                    <select
-                      value={preliminaryRoundsType}
-                      onChange={(e) => setPreliminaryRoundsType(e.target.value as 'number' | 'until_one_undefeated' | 'until_two_undefeated')}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: isDark ? '1px solid #444' : '1px solid #ddd',
-                        backgroundColor: isDark ? '#2a2a2a' : '#fff',
-                        color: isDark ? '#fff' : '#333',
-                        fontSize: '14px',
-                      }}
-                    >
-                      <option value="number">指定回戦数</option>
-                      <option value="until_one_undefeated">無敗が1人になるまで</option>
-                      <option value="until_two_undefeated">無敗が2人になるまで</option>
-                    </select>
-                  </div>
-                  {preliminaryRoundsType === 'number' && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                        対戦表回戦数
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={preliminaryRoundsNumber}
-                        onChange={(e) => setPreliminaryRoundsNumber(parseInt(e.target.value) || 1)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: isDark ? '1px solid #444' : '1px solid #ddd',
-                          backgroundColor: isDark ? '#2a2a2a' : '#fff',
-                          color: isDark ? '#fff' : '#333',
-                          fontSize: '14px',
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={handleCreateTournament}
-                      disabled={creatingTournament || getCheckedInCount() < 2}
-                      style={{
-                        padding: '10px 20px',
-                        backgroundColor: creatingTournament || getCheckedInCount() < 2 ? '#ccc' : '#4caf50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: creatingTournament || getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {creatingTournament ? '作成中...' : '作成'}
-                    </button>
-                    <button
-                      onClick={() => setShowTournamentCreateForm(false)}
-                      disabled={creatingTournament}
-                      style={{
-                        padding: '10px 20px',
-                        backgroundColor: isDark ? '#444' : '#f5f5f5',
-                        color: isDark ? '#fff' : '#333',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: creatingTournament ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {renderTournamentCreatePanel()}
 
           {/* チェックイン（参加者のみ） */}
           {tournament.status === 'registration' && participants.some((p) => p.userId === user?.id && !p.cancelledAt) && (
@@ -1880,7 +1909,7 @@ export default function TournamentDetailPage() {
               <span
                 style={{
                   marginLeft: '12px',
-                  fontSize: '14px',
+                  fontSize: '16px',
                   color: isDark ? '#aaa' : '#666',
                   fontWeight: 'normal',
                 }}
@@ -2112,6 +2141,7 @@ export default function TournamentDetailPage() {
       {/* トーナメントタブ */}
       {activeTab === 'tournament' && (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          {renderTournamentCreatePanel()}
           {/* 管理画面へのリンク（管理者または主催者のみ） */}
           {canEditTournament && (
             <div style={{ marginBottom: '20px', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -2538,6 +2568,8 @@ export default function TournamentDetailPage() {
                                     alert(`第${selectedRound}回戦を開始しました`)
                                     await loadTournament()
                                     await loadMatches() // すべてのラウンドのマッチを読み込む
+                                    await loadParticipants()
+                                    await loadEntryStatus()
                                   } catch (error: any) {
                                     console.error('Start round error:', error)
                                     const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
