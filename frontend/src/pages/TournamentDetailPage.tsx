@@ -28,6 +28,7 @@ import {
   createTournamentBracket,
   getTournamentBracket,
   resetTournamentBracket,
+  uploadTournamentLogo,
   TournamentBracket,
 } from '../api/tournaments'
 import { useAuthStore } from '../stores/authStore'
@@ -77,7 +78,17 @@ function getTimeRemaining(targetDate: Date): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
-type TabType = 'details' | 'participants' | 'tournament' | 'announcement'
+function resolveLogoUrl(url?: string): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/tournaments/')) {
+    const apiBase = import.meta.env.VITE_API_URL || '/Tournament/api'
+    return `${apiBase}${url}`
+  }
+  return url
+}
+
+type TabType = 'details' | 'participants' | 'tournament' | 'finalTournament' | 'announcement'
 
 // 決勝トーナメントブラケット表示コンポーネント
 interface TournamentBracketDisplayProps {
@@ -88,6 +99,10 @@ interface TournamentBracketDisplayProps {
 }
 
 function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: TournamentBracketDisplayProps) {
+  const defaultLineColor = isDark ? '#666' : '#333'
+  const winnerLineColor = '#e53935'
+  const getMatchLineColor = (match: Match) => (match.result ? winnerLineColor : defaultLineColor)
+
   const handlePlayerClick = async (match: Match, playerId: string) => {
     // 既に結果が登録されている場合は何もしない
     if (match.result) return
@@ -172,7 +187,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                         y1={currentY}
                         x2={roundGap / 2}
                         y2={currentY}
-                        stroke={isDark ? '#666' : '#333'}
+                        stroke={getMatchLineColor(match)}
                         strokeWidth="2"
                       />
                     </g>
@@ -199,7 +214,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={startY}
                           x2={roundGap / 2}
                           y2={endY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                         {/* 水平線（次のラウンドへ） */}
@@ -208,7 +223,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={nextY}
                           x2={roundGap}
                           y2={nextY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                         {/* 中央の垂直線（結合点から次のラウンドへ） */}
@@ -217,7 +232,7 @@ function TournamentBracketDisplay({ bracket, user, isDark, onWinnerSelect }: Tou
                           y1={centerY}
                           x2={roundGap / 2}
                           y2={nextY}
-                          stroke={isDark ? '#666' : '#333'}
+                          stroke={defaultLineColor}
                           strokeWidth="2"
                         />
                       </g>
@@ -414,6 +429,7 @@ export default function TournamentDetailPage() {
     description: string
     logoImageUrl: string
     entryFee: number | null
+    tournamentSize: 4 | 8 | 16 | 32
     venueName: string
     venueAddress: string
     eventDate: string
@@ -431,6 +447,7 @@ export default function TournamentDetailPage() {
   const [showGuestForm, setShowGuestForm] = useState(false)
   const [guestPlayerName, setGuestPlayerName] = useState('')
   const [addingGuest, setAddingGuest] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
   const [showTournamentCreateForm, setShowTournamentCreateForm] = useState(false)
   const [preliminaryRoundsType, setPreliminaryRoundsType] = useState<'number' | 'until_one_undefeated' | 'until_two_undefeated'>('number')
   const [preliminaryRoundsNumber, setPreliminaryRoundsNumber] = useState<number>(3)
@@ -495,7 +512,13 @@ export default function TournamentDetailPage() {
       if (canEdit) {
         checkPreliminaryStatus()
       }
-      // トーナメントタブでも決勝トーナメントデータを読み込む（ボタン表示用）
+    }
+
+    if (activeTab === 'finalTournament') {
+      // 予選完了判定をチェック（管理者/開催者のみ）
+      if (canEdit) {
+        checkPreliminaryStatus()
+      }
       const loadBracket = async () => {
         try {
           const bracket = await getTournamentBracket(id)
@@ -666,6 +689,17 @@ export default function TournamentDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (!tournament || matches.length === 0) return
+    const availableRounds = Array.from(new Set(matches.map((m) => m.round))).sort((a, b) => a - b)
+    if (!availableRounds.includes(selectedRound)) {
+      const fallbackRound = availableRounds.includes(tournament.currentRound || 0)
+        ? (tournament.currentRound as number)
+        : availableRounds[0]
+      setSelectedRound(fallbackRound)
+    }
+  }, [matches, selectedRound, tournament])
+
   const loadStandings = async () => {
     if (!id) return
     try {
@@ -761,6 +795,7 @@ export default function TournamentDetailPage() {
       description: tournament.description || '',
       logoImageUrl: (tournament as any).logoImageUrl || '',
       entryFee: (tournament as any).entryFee ?? null,
+      tournamentSize: (tournament.tournamentSize as 4 | 8 | 16 | 32) || 8,
       venueName: (tournament as any).venueName || '',
       venueAddress: (tournament as any).venueAddress || '',
       eventDate: tournament.eventDate || '',
@@ -773,6 +808,7 @@ export default function TournamentDetailPage() {
       isPublic: (tournament as any).isPublic !== undefined ? (tournament as any).isPublic : true,
     })
     setIsEditing(true)
+    setLogoFile(null)
   }
 
   // 開催日を設定したら、時間の日付部分を自動設定
@@ -822,17 +858,22 @@ export default function TournamentDetailPage() {
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditingData(null)
+    setLogoFile(null)
   }
 
   const handleSaveTournament = async () => {
     if (!id || !editingData) return
     setSaving(true)
     try {
+      if (logoFile) {
+        await uploadTournamentLogo(id, logoFile)
+      }
       const updated = await updateTournament(id, {
         name: editingData.name,
         description: editingData.description || undefined,
-        logoImageUrl: editingData.logoImageUrl || undefined,
+        logoImageUrl: logoFile ? undefined : editingData.logoImageUrl || undefined,
         entryFee: editingData.entryFee ?? undefined,
+        tournamentSize: editingData.tournamentSize,
         venueName: editingData.venueName || undefined,
         venueAddress: editingData.venueAddress || undefined,
         eventDate: editingData.eventDate || undefined,
@@ -847,6 +888,7 @@ export default function TournamentDetailPage() {
       setTournament(updated)
       setIsEditing(false)
       setEditingData(null)
+      setLogoFile(null)
       alert('大会情報を更新しました')
     } catch (error: any) {
       alert(error.response?.data?.message || '大会情報の更新に失敗しました')
@@ -953,6 +995,156 @@ export default function TournamentDetailPage() {
     } finally {
       setCreatingTournament(false)
     }
+  }
+
+  const renderTournamentCreatePanel = () => {
+    const canShow =
+      canEditTournament &&
+      (tournament?.status === 'registration' ||
+        tournament?.status === 'draft' ||
+        (tournament?.status as string) === 'preparing') &&
+      isAfterRegistrationEnd()
+
+    if (!canShow) return null
+
+    return (
+      <div
+        style={{
+          marginBottom: '30px',
+          padding: '15px',
+          border: `1px solid ${isDark ? '#333' : '#ccc'}`,
+          borderRadius: '8px',
+          backgroundColor: isDark ? '#1a1a1a' : '#fff',
+        }}
+      >
+        <h3 style={{ color: isDark ? '#fff' : '#333', marginBottom: '15px' }}>マッチング作成</h3>
+        {!showTournamentCreateForm ? (
+          <div>
+            <p style={{ color: isDark ? '#aaa' : '#666', marginBottom: '15px' }}>
+              チェックイン済み: {getCheckedInCount()}名
+              {getCheckedInCount() < 2 && (
+                <span style={{ color: '#f44336', marginLeft: '10px' }}>(2名以上必要)</span>
+              )}
+            </p>
+            <button
+              onClick={() => setShowTournamentCreateForm(true)}
+              disabled={getCheckedInCount() < 2}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: getCheckedInCount() < 2 ? '#ccc' : '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: 'bold',
+              }}
+            >
+              マッチングを作成
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: '15px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  marginBottom: '5px',
+                  color: isDark ? '#fff' : '#333',
+                  fontWeight: 'bold',
+                }}
+              >
+                対戦表終了条件
+              </label>
+              <select
+                value={preliminaryRoundsType}
+                onChange={(e) =>
+                  setPreliminaryRoundsType(
+                    e.target.value as 'number' | 'until_one_undefeated' | 'until_two_undefeated'
+                  )
+                }
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: '6px',
+                  border: isDark ? '1px solid #444' : '1px solid #ddd',
+                  backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                  color: isDark ? '#fff' : '#333',
+                  fontSize: '14px',
+                }}
+              >
+                <option value="number">指定回戦数</option>
+                <option value="until_one_undefeated">無敗が1人になるまで</option>
+                <option value="until_two_undefeated">無敗が2人になるまで</option>
+              </select>
+            </div>
+            {preliminaryRoundsType === 'number' && (
+              <div style={{ marginBottom: '15px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    color: isDark ? '#fff' : '#333',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  対戦表回戦数
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={preliminaryRoundsNumber}
+                  onChange={(e) => setPreliminaryRoundsNumber(parseInt(e.target.value) || 1)}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    borderRadius: '6px',
+                    border: isDark ? '1px solid #444' : '1px solid #ddd',
+                    backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                    color: isDark ? '#fff' : '#333',
+                    fontSize: '14px',
+                  }}
+                />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={handleCreateTournament}
+                disabled={creatingTournament || getCheckedInCount() < 2}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: creatingTournament || getCheckedInCount() < 2 ? '#ccc' : '#4caf50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: creatingTournament || getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {creatingTournament ? '作成中...' : '作成'}
+              </button>
+              <button
+                onClick={() => setShowTournamentCreateForm(false)}
+                disabled={creatingTournament}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: isDark ? '#444' : '#f5f5f5',
+                  color: isDark ? '#fff' : '#333',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: creatingTournament ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                }}
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   const handleToggleCheckIn = async (participantId: string) => {
@@ -1152,6 +1344,7 @@ export default function TournamentDetailPage() {
           { id: 'details' as TabType, label: 'イベント詳細' },
           { id: 'participants' as TabType, label: '参加者' },
           { id: 'tournament' as TabType, label: 'トーナメント' },
+          { id: 'finalTournament' as TabType, label: '決勝トーナメント' },
           { id: 'announcement' as TabType, label: 'アナウンス' },
         ].map((tab) => (
           <button
@@ -1256,12 +1449,12 @@ export default function TournamentDetailPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                  ロゴ画像URL
+                  ロゴ画像
                 </label>
                 <input
-                  type="text"
-                  value={editingData.logoImageUrl}
-                  onChange={(e) => setEditingData({ ...editingData, logoImageUrl: e.target.value })}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -1272,6 +1465,9 @@ export default function TournamentDetailPage() {
                     fontSize: '16px',
                   }}
                 />
+                <div style={{ marginTop: '6px', fontSize: '12px', color: isDark ? '#aaa' : '#666' }}>
+                  {logoFile ? `選択中: ${logoFile.name}` : editingData.logoImageUrl ? '現在の画像を使用中' : '未設定'}
+                </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
@@ -1429,6 +1625,30 @@ export default function TournamentDetailPage() {
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
+                  決勝トーナメント進出人数
+                </label>
+                <select
+                  value={editingData.tournamentSize}
+                  onChange={(e) => setEditingData({ ...editingData, tournamentSize: parseInt(e.target.value, 10) as 4 | 8 | 16 | 32 })}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: isDark ? '1px solid #444' : '1px solid #ddd',
+                    backgroundColor: isDark ? '#2a2a2a' : '#fff',
+                    color: isDark ? '#fff' : '#333',
+                    fontSize: '16px',
+                  }}
+                >
+                  <option value={4}>4人</option>
+                  <option value={8}>8人</option>
+                  <option value={16}>16人</option>
+                  <option value={32}>32人</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
                   定員
                 </label>
                 <input
@@ -1505,13 +1725,13 @@ export default function TournamentDetailPage() {
           ) : (
             <>
               {/* ロゴ画像 */}
-              {(tournament as any).logoImageUrl && (
+              {resolveLogoUrl((tournament as any).logoImageUrl) && (
                 <div
                   style={{
                     width: '100%',
                     height: '300px',
                     backgroundColor: isDark ? '#1a1a1a' : '#f5f5f5',
-                    backgroundImage: `url(${(tournament as any).logoImageUrl})`,
+                    backgroundImage: `url(${resolveLogoUrl((tournament as any).logoImageUrl)})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
@@ -1667,6 +1887,23 @@ export default function TournamentDetailPage() {
                 </span>
               </div>
             )}
+
+            {/* 決勝トーナメント進出人数 */}
+            {tournament.tournamentSize && (
+              <div
+                style={{
+                  marginBottom: '15px',
+                  fontSize: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: isDark ? '#fff' : '#333',
+                }}
+              >
+                <span>🏆</span>
+                <span>決勝トーナメント進出人数: {tournament.tournamentSize}人</span>
+              </div>
+            )}
                 </div>
               )}
 
@@ -1681,128 +1918,7 @@ export default function TournamentDetailPage() {
               <div>現在時刻: {getJSTNow().toISOString()}</div>
             </div>
           )}
-          {canEditTournament && (tournament.status === 'registration' || tournament.status === 'draft' || (tournament.status as string) === 'preparing') && isAfterRegistrationEnd() && (
-            <div
-              style={{
-                marginBottom: '30px',
-                padding: '15px',
-                border: `1px solid ${isDark ? '#333' : '#ccc'}`,
-                borderRadius: '8px',
-                backgroundColor: isDark ? '#1a1a1a' : '#fff',
-              }}
-            >
-              <h3 style={{ color: isDark ? '#fff' : '#333', marginBottom: '15px' }}>マッチング作成</h3>
-              {!showTournamentCreateForm ? (
-                <div>
-                  <p style={{ color: isDark ? '#aaa' : '#666', marginBottom: '15px' }}>
-                    チェックイン済み: {getCheckedInCount()}名
-                    {getCheckedInCount() < 2 && (
-                      <span style={{ color: '#f44336', marginLeft: '10px' }}>
-                        (2名以上必要)
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    onClick={() => setShowTournamentCreateForm(true)}
-                    disabled={getCheckedInCount() < 2}
-                    style={{
-                      padding: '10px 20px',
-                      backgroundColor: getCheckedInCount() < 2 ? '#ccc' : '#2196F3',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    マッチングを作成
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ marginBottom: '15px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                      対戦表終了条件
-                    </label>
-                    <select
-                      value={preliminaryRoundsType}
-                      onChange={(e) => setPreliminaryRoundsType(e.target.value as 'number' | 'until_one_undefeated' | 'until_two_undefeated')}
-                      style={{
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: isDark ? '1px solid #444' : '1px solid #ddd',
-                        backgroundColor: isDark ? '#2a2a2a' : '#fff',
-                        color: isDark ? '#fff' : '#333',
-                        fontSize: '14px',
-                      }}
-                    >
-                      <option value="number">指定回戦数</option>
-                      <option value="until_one_undefeated">無敗が1人になるまで</option>
-                      <option value="until_two_undefeated">無敗が2人になるまで</option>
-                    </select>
-                  </div>
-                  {preliminaryRoundsType === 'number' && (
-                    <div style={{ marginBottom: '15px' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', color: isDark ? '#fff' : '#333', fontWeight: 'bold' }}>
-                        対戦表回戦数
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={preliminaryRoundsNumber}
-                        onChange={(e) => setPreliminaryRoundsNumber(parseInt(e.target.value) || 1)}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          borderRadius: '6px',
-                          border: isDark ? '1px solid #444' : '1px solid #ddd',
-                          backgroundColor: isDark ? '#2a2a2a' : '#fff',
-                          color: isDark ? '#fff' : '#333',
-                          fontSize: '14px',
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      onClick={handleCreateTournament}
-                      disabled={creatingTournament || getCheckedInCount() < 2}
-                      style={{
-                        padding: '10px 20px',
-                        backgroundColor: creatingTournament || getCheckedInCount() < 2 ? '#ccc' : '#4caf50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: creatingTournament || getCheckedInCount() < 2 ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      {creatingTournament ? '作成中...' : '作成'}
-                    </button>
-                    <button
-                      onClick={() => setShowTournamentCreateForm(false)}
-                      disabled={creatingTournament}
-                      style={{
-                        padding: '10px 20px',
-                        backgroundColor: isDark ? '#444' : '#f5f5f5',
-                        color: isDark ? '#fff' : '#333',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: creatingTournament ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {renderTournamentCreatePanel()}
 
           {/* チェックイン（参加者のみ） */}
           {tournament.status === 'registration' && participants.some((p) => p.userId === user?.id && !p.cancelledAt) && (
@@ -1866,6 +1982,16 @@ export default function TournamentDetailPage() {
             >
               参加者一覧 ({participants.length}
               {entryStatus?.tournament.capacity ? `/${entryStatus.tournament.capacity}` : ''}名)
+              <span
+                style={{
+                  marginLeft: '12px',
+                  fontSize: '16px',
+                  color: isDark ? '#aaa' : '#666',
+                  fontWeight: 'normal',
+                }}
+              >
+                チェックイン済み: {getCheckedInCount()}名
+              </span>
             </h2>
             {/* ゲストユーザー追加ボタン（管理者または主催者のみ、受付時間外でも可能） */}
             {canEditTournament && (
@@ -2091,6 +2217,7 @@ export default function TournamentDetailPage() {
       {/* トーナメントタブ */}
       {activeTab === 'tournament' && (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          {renderTournamentCreatePanel()}
           {/* 管理画面へのリンク（管理者または主催者のみ） */}
           {canEditTournament && (
             <div style={{ marginBottom: '20px', textAlign: 'right', display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -2219,76 +2346,10 @@ export default function TournamentDetailPage() {
                       cursor: 'pointer',
                       fontWeight: 'bold',
                       fontSize: '16px',
-                      marginRight: '10px',
                     }}
                   >
                     予選順位表発表
                   </button>
-                  <button
-                    onClick={async () => {
-                      if (!id) return
-                      if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
-                      try {
-                        await resetTournamentBracket(id)
-                        alert('決勝トーナメントをリセットしました')
-                        setTournamentBracket(null)
-                        await loadTournament()
-                        // トーナメントタブの場合は、決勝トーナメントデータを再読み込み
-                        const bracket = await getTournamentBracket(id)
-                        setTournamentBracket(bracket)
-                      } catch (error: any) {
-                        console.error('Reset tournament bracket error:', error)
-                        const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
-                        alert(errorMessage)
-                      }
-                    }}
-                    style={{
-                      padding: '12px 24px',
-                      backgroundColor: '#f44336',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      fontSize: '16px',
-                      marginRight: '10px',
-                    }}
-                  >
-                    決勝トーナメントリセット
-                  </button>
-                  {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
-                    <button
-                      onClick={async () => {
-                        if (!id) return
-                        if (!confirm('決勝トーナメントを作成しますか？')) return
-                        try {
-                          setLoadingBracket(true)
-                          await createTournamentBracket(id)
-                          const bracket = await getTournamentBracket(id)
-                          setTournamentBracket(bracket)
-                          alert('決勝トーナメントを作成しました')
-                          // 決勝トーナメント作成後、自動で表示されるようにする
-                        } catch (error: any) {
-                          alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
-                        } finally {
-                          setLoadingBracket(false)
-                        }
-                      }}
-                      disabled={loadingBracket}
-                      style={{
-                        padding: '12px 24px',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: loadingBracket ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '16px',
-                      }}
-                    >
-                      {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -2401,6 +2462,8 @@ export default function TournamentDetailPage() {
                           {rounds.map((round) => {
                             // 実際の対戦マッチのみをカウント（isTournamentMatch: true）
                             const roundMatches = matches.filter(m => m.round === round && m.isTournamentMatch)
+                            const roundMatchCount = matches.filter(m => m.round === round).length
+                            const isSelectable = roundMatchCount > 0
                             // resultがnullでないことを確認
                             const roundCompleted = roundMatches.filter(m => m.result != null).length
                             const roundTotal = roundMatches.length
@@ -2421,16 +2484,21 @@ export default function TournamentDetailPage() {
                               <button
                                 key={round}
                                 onClick={() => {
+                                  if (!isSelectable) return
                                   setSelectedRound(round)
                                   // ラウンド選択時は、すべてのラウンドのマッチを読み込む（既に読み込まれている場合は更新のみ）
                                   loadMatches()
                                 }}
                                 style={{
                                   padding: isMobile ? '8px 16px' : '10px 20px',
-                                  backgroundColor: isCurrentRound 
+                                  backgroundColor: !isSelectable
+                                    ? (isDark ? '#2a2a2a' : '#f0f0f0')
+                                    : isCurrentRound 
                                     ? (isRoundCompleted ? (isDark ? '#333' : '#e0e0e0') : (isActiveRound ? '#4CAF50' : (isDark ? '#333' : '#2196F3')))
                                     : (isActiveRound && !isRoundCompleted ? (isDark ? '#1a3a1a' : '#e8f5e9') : 'transparent'),
-                                  color: isCurrentRound 
+                                  color: !isSelectable
+                                    ? (isDark ? '#777' : '#999')
+                                    : isCurrentRound 
                                     ? (isRoundCompleted ? (isDark ? '#fff' : '#333') : 'white')
                                     : (isActiveRound && !isRoundCompleted
                                         ? (isDark ? '#4CAF50' : '#2e7d32')
@@ -2438,14 +2506,16 @@ export default function TournamentDetailPage() {
                                             ? (isDark ? '#888' : '#999')
                                             : (isDark ? '#fff' : '#333'))),
                                   border: `2px solid ${
-                                    isCurrentRound 
+                                    !isSelectable
+                                      ? (isDark ? '#333' : '#ddd')
+                                      : isCurrentRound 
                                       ? (isRoundCompleted ? '#2196F3' : (isActiveRound ? '#4CAF50' : '#2196F3'))
                                       : (isActiveRound && !isRoundCompleted
                                           ? (isDark ? '#4CAF50' : '#4CAF50')
                                           : (isDark ? '#444' : '#ddd'))
                                   }`,
                                   borderRadius: '8px',
-                                  cursor: 'pointer',
+                                  cursor: isSelectable ? 'pointer' : 'not-allowed',
                                   fontWeight: isCurrentRound ? 'bold' : (isActiveRound ? '600' : 'normal'),
                                   fontSize: isMobile ? '13px' : '14px',
                                   transition: 'all 0.2s',
@@ -2453,13 +2523,13 @@ export default function TournamentDetailPage() {
                                   position: 'relative',
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (!isCurrentRound) {
+                                  if (!isCurrentRound && isSelectable) {
                                     e.currentTarget.style.transform = 'translateY(-2px)'
                                     e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'
                                   }
                                 }}
                                 onMouseLeave={(e) => {
-                                  if (!isCurrentRound) {
+                                  if (!isCurrentRound && isSelectable) {
                                     e.currentTarget.style.transform = 'translateY(0)'
                                     e.currentTarget.style.boxShadow = 'none'
                                   }
@@ -2490,7 +2560,7 @@ export default function TournamentDetailPage() {
                                       opacity: 0.6,
                                       color: isDark ? '#888' : '#999',
                                     }}>
-                                      {isRoundCompleted ? '✓完了' : (isActiveRound ? '進行中' : '未開始')}
+                                      {isRoundCompleted ? '✓完了' : (isActiveRound ? '進行中' : (isSelectable ? '未開始' : ''))}
                                     </div>
                                   )}
                                   {isRoundCompleted ? (
@@ -2583,6 +2653,8 @@ export default function TournamentDetailPage() {
                                     alert(`第${selectedRound}回戦を開始しました`)
                                     await loadTournament()
                                     await loadMatches() // すべてのラウンドのマッチを読み込む
+                                    await loadParticipants()
+                                    await loadEntryStatus()
                                   } catch (error: any) {
                                     console.error('Start round error:', error)
                                     const errorMessage = error.response?.data?.message || error.message || '回戦の開始に失敗しました'
@@ -3121,43 +3193,145 @@ export default function TournamentDetailPage() {
             </div>
           )}
 
-          {/* 決勝トーナメント表示 */}
-          {tournamentBracket && tournamentBracket.rounds.length > 0 && (
-            <div style={{ marginTop: '40px', padding: '20px 0' }}>
-              <h3 style={{ 
-                color: isDark ? '#fff' : '#333', 
-                marginBottom: '20px',
-                fontSize: '20px',
-                fontWeight: 'bold',
-                textAlign: 'center',
-              }}>
-                決勝トーナメント
-              </h3>
-              <TournamentBracketDisplay
-                bracket={tournamentBracket}
-                user={user}
-                isDark={isDark}
-                onWinnerSelect={async (matchId: string, winnerId: string) => {
-                  if (!id) return
-                  try {
-                    // 勝者を登録
-                    const match = tournamentBracket.matches.find(m => m.id === matchId)
-                    if (!match) return
-                    
-                    const result = match.player1Id === winnerId ? 'player1' : 'player2'
-                    await reportMatchResult(id, matchId, result)
-                    
-                    // ブラケットを再読み込み
-                    const updatedBracket = await getTournamentBracket(id)
-                    setTournamentBracket(updatedBracket)
-                    // マッチも再読み込み
-                    await loadMatches()
-                  } catch (error: any) {
-                    alert(error.response?.data?.message || '結果の登録に失敗しました')
-                  }
-                }}
-              />
+        </div>
+      )}
+
+      {/* 決勝トーナメントタブ */}
+      {activeTab === 'finalTournament' && (
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          {tournament.tournamentSize && (
+            <div
+              style={{
+                marginBottom: '15px',
+                padding: '10px 12px',
+                border: `1px solid ${isDark ? '#333' : '#ddd'}`,
+                borderRadius: '8px',
+                color: isDark ? '#fff' : '#333',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDark ? '#1a1a1a' : '#fafafa',
+              }}
+            >
+              <span>🏆</span>
+              <span>決勝トーナメント進出人数: {tournament.tournamentSize}人</span>
             </div>
+          )}
+          {!isPreliminaryCompleted ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
+              <p>予選順位表の発表後に決勝トーナメントを作成できます</p>
+            </div>
+          ) : (
+            <>
+              {canEditTournament && (
+                <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+                  <button
+                    onClick={async () => {
+                      if (!id) return
+                      if (!confirm('決勝トーナメントをリセットしますか？\nすべての決勝トーナメントのマッチが削除されます。')) return
+                      try {
+                        await resetTournamentBracket(id)
+                        alert('決勝トーナメントをリセットしました')
+                        setTournamentBracket(null)
+                        const bracket = await getTournamentBracket(id)
+                        setTournamentBracket(bracket)
+                      } catch (error: any) {
+                        console.error('Reset tournament bracket error:', error)
+                        const errorMessage = error.response?.data?.message || error.message || '決勝トーナメントのリセットに失敗しました'
+                        alert(errorMessage)
+                      }
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: '#f44336',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                      marginRight: '10px',
+                    }}
+                  >
+                    決勝トーナメントリセット
+                  </button>
+                  {(!tournamentBracket || tournamentBracket.rounds.length === 0) && (
+                    <button
+                      onClick={async () => {
+                        if (!id) return
+                        if (!confirm('決勝トーナメントを作成しますか？')) return
+                        try {
+                          setLoadingBracket(true)
+                          await createTournamentBracket(id)
+                          const bracket = await getTournamentBracket(id)
+                          setTournamentBracket(bracket)
+                          alert('決勝トーナメントを作成しました')
+                        } catch (error: any) {
+                          alert(error.response?.data?.message || '決勝トーナメントの作成に失敗しました')
+                        } finally {
+                          setLoadingBracket(false)
+                        }
+                      }}
+                      disabled={loadingBracket}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: loadingBracket ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '16px',
+                      }}
+                    >
+                      {loadingBracket ? '作成中...' : '決勝トーナメント作成'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {tournamentBracket && tournamentBracket.rounds.length > 0 ? (
+                <div style={{ marginTop: '20px', padding: '20px 0' }}>
+                  <h3 style={{ 
+                    color: isDark ? '#fff' : '#333', 
+                    marginBottom: '20px',
+                    fontSize: '20px',
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                  }}>
+                    決勝トーナメント
+                  </h3>
+                  <TournamentBracketDisplay
+                    bracket={tournamentBracket}
+                    user={user}
+                    isDark={isDark}
+                    onWinnerSelect={async (matchId: string, winnerId: string) => {
+                      if (!id) return
+                      try {
+                        // 勝者を登録
+                        const match = tournamentBracket.matches.find(m => m.id === matchId)
+                        if (!match) return
+                        
+                        const result = match.player1Id === winnerId ? 'player1' : 'player2'
+                        await reportMatchResult(id, matchId, result)
+                        
+                        // ブラケットを再読み込み
+                        const updatedBracket = await getTournamentBracket(id)
+                        setTournamentBracket(updatedBracket)
+                        // マッチも再読み込み
+                        await loadMatches()
+                      } catch (error: any) {
+                        alert(error.response?.data?.message || '結果の登録に失敗しました')
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px', color: isDark ? '#aaa' : '#666' }}>
+                  <p>決勝トーナメントはまだ作成されていません</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -7,10 +7,14 @@ set -e
 
 echo "=== TCG Tournament System デプロイスクリプト ==="
 
-# 現在のディレクトリが /var/www/Tournament であることを確認
-if [ "$(basename $(pwd))" != "Tournament" ]; then
-    echo "エラー: このスクリプトは /var/www/Tournament ディレクトリから実行してください"
-    exit 1
+# スクリプトの場所からプロジェクトルートを特定（どこから実行してもOK）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT_DIR"
+
+if [ ! -d ".git" ]; then
+  echo "エラー: Gitリポジトリのルートで実行できません"
+  exit 1
 fi
 
 # Gitから最新のコードを取得
@@ -31,17 +35,17 @@ chmod +x frontend/deploy-to-tournament.sh
 
 # 環境変数の設定
 export VITE_BASE_PATH="/Tournament"
-export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/api}"
+export VITE_API_URL="${VITE_API_URL:-https://pcg-kansai-judge.jp/Tournament/api}"
 
 # フロントエンドのビルド
 echo "フロントエンドをビルド中..."
-cd frontend
+cd "$ROOT_DIR/frontend"
 npm install
 npm run build
 
 # ビルド結果をルートディレクトリに移動
 echo "ビルド結果を配置中..."
-cd ..
+cd "$ROOT_DIR"
 sudo rm -rf *.html *.js *.css assets 2>/dev/null || true
 sudo cp -r frontend/dist/* .
 
@@ -52,11 +56,13 @@ sudo chmod -R 755 .
 
 # バックエンドの再ビルドと再起動
 echo "バックエンドを再ビルド中..."
-cd backend
+cd "$ROOT_DIR/backend"
 npm install
 npm run build
 echo "バックエンドを再起動中..."
-pm2 restart tcg-backend || echo "警告: PM2の再起動に失敗しました（プロセスが存在しない可能性があります）"
+pm2 stop tcg-backend || echo "警告: PM2の停止に失敗しました（プロセスが存在しない可能性があります）"
+PORT=5001 pm2 start /var/www/Tournament/backend/dist/index.js --name tcg-backend
+pm2 save
 
 echo ""
 echo "✓ デプロイ完了！"

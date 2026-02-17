@@ -4,6 +4,16 @@ import { Tournament } from '../types'
 import { getTournaments, getEntryStatus } from '../api/tournaments'
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 
+function resolveLogoUrl(url?: string): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  if (url.startsWith('/tournaments/')) {
+    const apiBase = import.meta.env.VITE_API_URL || '/Tournament/api'
+    return `${apiBase}${url}`
+  }
+  return url
+}
+
 interface TournamentWithEntryStatus extends Tournament {
   entryStatus?: {
     isEntryPeriod: boolean
@@ -63,7 +73,12 @@ export default function TournamentListPage() {
     if (myEntry.cancelledAt) {
       return '未エントリー'
     }
-    if (myEntry.isWaitlist) {
+    if (
+      myEntry.isWaitlist &&
+      (tournament.status === 'registration' ||
+        tournament.status === 'preparing' ||
+        tournament.status === 'draft')
+    ) {
       return 'キャンセル待ち'
     }
     return 'エントリー済み'
@@ -77,7 +92,12 @@ export default function TournamentListPage() {
     if (!myEntry || myEntry.cancelledAt) {
       return '#f44336' // 赤: 未エントリー
     }
-    if (myEntry.isWaitlist) {
+    if (
+      myEntry.isWaitlist &&
+      (tournament.status === 'registration' ||
+        tournament.status === 'preparing' ||
+        tournament.status === 'draft')
+    ) {
       return '#FF9800' // オレンジ: キャンセル待ち
     }
     return '#2196F3' // 青: エントリー済み
@@ -202,7 +222,7 @@ export default function TournamentListPage() {
                     width: '100%',
                     height: '180px',
                     backgroundColor: '#f5f5f5',
-                    backgroundImage: tournament.logoImageUrl ? `url(${tournament.logoImageUrl})` : 'none',
+                    backgroundImage: resolveLogoUrl(tournament.logoImageUrl) ? `url(${resolveLogoUrl(tournament.logoImageUrl)})` : 'none',
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',

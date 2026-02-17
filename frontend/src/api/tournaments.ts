@@ -56,6 +56,7 @@ export const updateTournament = async (
     description?: string
     logoImageUrl?: string
     entryFee?: number
+    tournamentSize?: 4 | 8 | 16 | 32
     venueName?: string
     venueAddress?: string
     eventDate?: string
@@ -69,6 +70,22 @@ export const updateTournament = async (
   }
 ): Promise<Tournament> => {
   const response = await apiClient.patch<Tournament>(`/tournaments/${tournamentId}`, data)
+  return response.data
+}
+
+export const uploadTournamentLogo = async (
+  tournamentId: string,
+  file: File
+): Promise<{ logoImageUrl: string }> => {
+  const formData = new FormData()
+  formData.append('logo', file)
+  const response = await apiClient.post<{ logoImageUrl: string }>(
+    `/tournaments/${tournamentId}/logo`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  )
   return response.data
 }
 

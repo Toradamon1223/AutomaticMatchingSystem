@@ -91,7 +91,12 @@ export default function DashboardPage() {
     const tournamentStatus = getTournamentStatusText(tournament)
 
     // エントリー状況（エントリー済みのもののみ表示される）
-    if (participant.isWaitlist) {
+    if (
+      participant.isWaitlist &&
+      (tournament.status === 'registration' ||
+        tournament.status === 'preparing' ||
+        tournament.status === 'draft')
+    ) {
       return `${tournamentStatus}（キャンセル待ち）`
     }
     return tournamentStatus

@@ -36,6 +36,8 @@ model Tournament {
   name              String
   description       String?
   logoImageUrl      String?  // ロゴ画像URL
+  logoImageData     Bytes?   // ロゴ画像データ（DB保存）
+  logoImageMimeType String?  // ロゴ画像のMIMEタイプ
   entryFee          Int?     // 参加費（円）
   organizerId       String
   organizer         User     @relation("Organizer", fields: [organizerId], references: [id])

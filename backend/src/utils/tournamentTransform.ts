@@ -17,10 +17,14 @@ export function transformTournament(tournament: PrismaTournament & { organizer?:
 
   // participantsを除外して返す（必要に応じて別途取得）
   const tournamentObj = tournament as any
-  const { participants, matches, ...tournamentWithoutRelations } = tournamentObj
+  const { participants, matches, logoImageData, logoImageMimeType, ...tournamentWithoutRelations } = tournamentObj
+  const resolvedLogoImageUrl = logoImageData
+    ? `/tournaments/${tournament.id}/logo`
+    : tournament.logoImageUrl
 
   return {
     ...tournamentWithoutRelations,
+    logoImageUrl: resolvedLogoImageUrl,
     status: tournament.status.toLowerCase() as 'draft' | 'registration' | 'preparing' | 'in_progress' | 'completed',
     preliminaryRounds,
   }

@@ -6,8 +6,13 @@ import { transformTournament, transformMatch } from '../utils/tournamentTransfor
 import { parseJSTISOString, getJSTNow } from '../utils/dateUtils'
 import QRCode from 'qrcode'
 import bcrypt from 'bcryptjs'
+import multer from 'multer'
 
 const router = express.Router()
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+})
 
 // 大会一覧取得
 router.get('/', authenticate, async (req: AuthRequest, res) => {
@@ -151,6 +156,7 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
       description,
       logoImageUrl,
       entryFee,
+      tournamentSize,
       venueName,
       venueAddress,
       eventDate,
@@ -168,6 +174,15 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res) => {
     if (description !== undefined) updateData.description = description
     if (logoImageUrl !== undefined) updateData.logoImageUrl = logoImageUrl
     if (entryFee !== undefined) updateData.entryFee = entryFee
+    if (tournamentSize !== undefined) {
+      if (![4, 8, 16, 32].includes(tournamentSize)) {
+        return res.status(400).json({ message: 'トーナメントサイズは4, 8, 16, 32のいずれかである必要があります' })
+      }
+      if (tournament.status === 'IN_PROGRESS') {
+        return res.status(400).json({ message: '大会進行中は決勝トーナメント進出人数を変更できません' })
+      }
+      updateData.tournamentSize = tournamentSize
+    }
     if (venueName !== undefined) updateData.venueName = venueName
     if (venueAddress !== undefined) updateData.venueAddress = venueAddress
     if (eventDate !== undefined) updateData.eventDate = eventDate ? parseJSTISOString(eventDate) : null
@@ -297,9 +312,14 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
       ? now >= tournament.entryStartAt && now <= tournament.entryEndAt
       : false
 
-    // 定員内の参加者数
-    const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
-    const waitlistCount = tournament.participants.filter((p: any) => p.isWaitlist).length
+    // 定員内/キャンセル待ちを再計算（エントリー順）
+    const maxParticipants = tournament.capacity || 0
+    const recalculatedParticipants = tournament.participants.map((p: any, index: number) => ({
+      ...p,
+      isWaitlist: maxParticipants > 0 && index >= maxParticipants,
+    }))
+    const confirmedCount = recalculatedParticipants.filter((p: any) => !p.isWaitlist).length
+    const waitlistCount = recalculatedParticipants.filter((p: any) => p.isWaitlist).length
     
     // デバッグ用（本番では削除可能）
     console.log('Entry status calculation:', {
@@ -317,7 +337,7 @@ router.get('/:id/entry-status', authenticate, async (req: AuthRequest, res) => {
     })
 
     // 現在のユーザーのエントリー状況
-    const myEntry = tournament.participants.find((p: any) => p.userId === req.userId!)
+    const myEntry = recalculatedParticipants.find((p: any) => p.userId === req.userId!)
 
     res.json({
       tournament: transformTournament(tournament),
@@ -868,15 +888,15 @@ router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, re
     const confirmedCount = tournament.participants.filter((p: any) => !p.isWaitlist).length
     const isWaitlist = tournament.capacity !== null && confirmedCount >= tournament.capacity
 
-    // 参加者として追加（エントリー済みだが、チェックインは未チェック）
+    // 参加者として追加（ゲストは即チェックイン）
     const participant = await prisma.participant.create({
       data: {
         tournamentId: req.params.id,
         userId: guestUser.id,
         enteredAt: getJSTNow(),
         isWaitlist,
-        checkedIn: false, // ゲストユーザーも他のユーザーと同じく手動でチェックイン
-        checkedInAt: null,
+        checkedIn: true,
+        checkedInAt: getJSTNow(),
       },
       include: {
         user: {
@@ -893,6 +913,69 @@ router.post('/:id/participants/guest', authenticate, async (req: AuthRequest, re
   } catch (error) {
     console.error('Add guest user error:', error)
     res.status(500).json({ message: 'ゲストユーザーの追加に失敗しました' })
+  }
+})
+
+// ロゴ画像アップロード（管理者または主催者のみ）
+router.post('/:id/logo', authenticate, requireRole('organizer', 'admin'), upload.single('logo'), async (req: AuthRequest, res) => {
+  try {
+    const tournament = await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+    })
+
+    if (!tournament) {
+      return res.status(404).json({ message: '大会が見つかりません' })
+    }
+
+    if (tournament.organizerId !== req.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: '権限がありません' })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: '画像ファイルを選択してください' })
+    }
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: '対応していない画像形式です（png/jpg/webp/gif）' })
+    }
+
+    await prisma.tournament.update({
+      where: { id: req.params.id },
+      data: {
+        logoImageData: req.file.buffer,
+        logoImageMimeType: req.file.mimetype,
+        logoImageUrl: null,
+      } as any,
+    })
+
+    res.json({ logoImageUrl: `/tournaments/${req.params.id}/logo` })
+  } catch (error) {
+    console.error('Upload logo error:', error)
+    res.status(500).json({ message: 'ロゴ画像のアップロードに失敗しました' })
+  }
+})
+
+// ロゴ画像取得
+router.get('/:id/logo', async (req, res) => {
+  try {
+    const tournament = (await prisma.tournament.findUnique({
+      where: { id: req.params.id },
+      select: {
+        logoImageData: true,
+        logoImageMimeType: true,
+      } as any,
+    })) as any
+
+    if (!tournament || !tournament.logoImageData) {
+      return res.status(404).send('Not Found')
+    }
+
+    res.setHeader('Content-Type', tournament.logoImageMimeType || 'application/octet-stream')
+    res.send(Buffer.from(tournament.logoImageData))
+  } catch (error) {
+    console.error('Get logo error:', error)
+    res.status(500).send('Error')
   }
 })
 
@@ -1221,28 +1304,21 @@ router.post('/:id/matches/:matchId/result', authenticate, async (req: AuthReques
     const round = updatedMatch.round
     ;(async () => {
       try {
-        // 予選の最大roundを取得
-        const maxPreliminaryRound = await prisma.match.findFirst({
-          where: { tournamentId: req.params.id },
-          orderBy: { round: 'desc' },
-          select: { round: true },
-        })
-        
-        // 決勝トーナメントのラウンドかどうかを判定（予選の最終roundより後のround）
-        const isTournamentRound = maxPreliminaryRound && round > maxPreliminaryRound.round
+        // 決勝トーナメントのラウンドかどうかを判定
+        const isTournamentRound = updatedMatch.isTournamentMatch
+
+        const matchFilter: any = {
+          tournamentId: req.params.id,
+          round,
+          isTournamentMatch: isTournamentRound,
+        }
 
         const totalMatchesInRound = await prisma.match.count({
-          where: {
-            tournamentId: req.params.id,
-            round,
-            isTournamentMatch: true, // 決勝トーナメントの場合はisTournamentMatch: trueのみ
-          },
+          where: matchFilter,
         })
         const completedMatchesInRound = await prisma.match.count({
           where: {
-            tournamentId: req.params.id,
-            round,
-            isTournamentMatch: true,
+            ...matchFilter,
             result: { not: null },
           },
         })
@@ -1379,6 +1455,20 @@ router.post('/:id/start', authenticate, requireRole('organizer', 'admin'), async
     if (checkedInCount < 2) {
       return res.status(400).json({ message: 'チェックイン済みの参加者が2名未満です' })
     }
+
+    // 第1回戦マッチング作成時、チェックイン未完了の参加者を除外
+    await prisma.participant.updateMany({
+      where: {
+        tournamentId: req.params.id,
+        checkedIn: false,
+        cancelledAt: null,
+      },
+      data: {
+        cancelledAt: new Date(),
+        checkedIn: false,
+        checkedInAt: null,
+      },
+    })
 
     // 予選回戦数と予選終了条件のバリデーション
     if (preliminaryRounds === undefined || preliminaryRounds === null) {
@@ -1628,6 +1718,22 @@ router.post('/:id/rounds/:round/start', authenticate, requireRole('organizer', '
       return res.status(400).json({ message: '大会が開始されていません' })
     }
 
+    // 第1回戦のマッチング発表時、チェックイン未完了の参加者を除外
+    if (round === 1) {
+      await prisma.participant.updateMany({
+        where: {
+          tournamentId: req.params.id,
+          checkedIn: false,
+          cancelledAt: null,
+        },
+        data: {
+          cancelledAt: new Date(),
+          checkedIn: false,
+          checkedInAt: null,
+        },
+      })
+    }
+
     // プレビュー用の対戦表を有効化（isTournamentMatch: trueに更新）
     const updatedMatches = await prisma.match.updateMany({
       where: {
@@ -1680,6 +1786,22 @@ router.post('/:id/start-matches', authenticate, requireRole('organizer', 'admin'
 
     if (tournament.status !== 'IN_PROGRESS') {
       return res.status(400).json({ message: '大会が開始されていません' })
+    }
+
+    // 第1回戦の公開時、チェックイン未完了の参加者を除外
+    if ((tournament.currentRound || 0) === 1) {
+      await prisma.participant.updateMany({
+        where: {
+          tournamentId: req.params.id,
+          checkedIn: false,
+          cancelledAt: null,
+        },
+        data: {
+          cancelledAt: new Date(),
+          checkedIn: false,
+          checkedInAt: null,
+        },
+      })
     }
 
     // 対戦表を公開
@@ -2114,19 +2236,6 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     // 順位を再計算
     await calculateStandings(tournament.id)
 
-    // 決勝トーナメントが作成されているかどうかをチェック（予選順位発表済みかどうかの判定）
-    // 決勝トーナメントマッチ（isTournamentMatch: true）が存在するかどうかで判定
-    const tournamentMatches = await prisma.match.findFirst({
-      where: {
-        tournamentId: req.params.id,
-        isTournamentMatch: true,
-      },
-      select: { id: true },
-    })
-
-    // 決勝トーナメントが作成されている場合、予選は完了している
-    const hasTournamentBracket = !!tournamentMatches
-
     let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
     try {
       const parsed = JSON.parse(tournament.preliminaryRounds)
@@ -2140,6 +2249,24 @@ router.get('/:id/preliminary-completed', authenticate, async (req: AuthRequest, 
     } catch {
       preliminaryRounds = tournament.preliminaryRounds as any
     }
+
+    // 決勝トーナメントが作成されているかどうかをチェック（予選順位発表済みかどうかの判定）
+    // 予選の最大回戦数より後のラウンドのみを決勝トーナメントとして扱う
+    const prelimRoundsNumber =
+      typeof preliminaryRounds === 'number' ? preliminaryRounds : 0
+    const finalBracketMinRound =
+      Math.max(tournament.maxRounds || 0, prelimRoundsNumber) + 1
+    const tournamentMatches = await prisma.match.findFirst({
+      where: {
+        tournamentId: req.params.id,
+        isTournamentMatch: true,
+        round: { gte: finalBracketMinRound },
+      },
+      select: { id: true },
+    })
+
+    // 決勝トーナメントが作成されている場合、予選は完了している
+    const hasTournamentBracket = !!tournamentMatches
 
     let isCompleted = false
     if (hasTournamentBracket) {
@@ -2293,22 +2420,31 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
       return res.status(404).json({ message: '大会が見つかりません' })
     }
 
-    // 予選の最大roundを取得
-    const maxRound = await prisma.match.findFirst({
-      where: { tournamentId: req.params.id },
-      orderBy: { round: 'desc' },
-      select: { round: true },
-    })
-
-    if (!maxRound) {
-      return res.json({ matches: [], rounds: [] })
+    let preliminaryRounds: number | 'until_one_undefeated' | 'until_two_undefeated'
+    try {
+      const parsed = JSON.parse(tournament.preliminaryRounds)
+      if (typeof parsed === 'number') {
+        preliminaryRounds = parsed
+      } else if (parsed === 'until_one_undefeated' || parsed === 'until_two_undefeated') {
+        preliminaryRounds = parsed
+      } else {
+        preliminaryRounds = parsed
+      }
+    } catch {
+      preliminaryRounds = tournament.preliminaryRounds as any
     }
 
-    // 決勝トーナメントのマッチを取得（予選の最終roundより後のround）
+    const prelimRoundsNumber =
+      typeof preliminaryRounds === 'number' ? preliminaryRounds : 0
+    const finalBracketMinRound =
+      Math.max(tournament.maxRounds || 0, prelimRoundsNumber) + 1
+
+    // 決勝トーナメントのマッチを取得（予選の最大回戦数より後のラウンドのみ）
     const tournamentMatches = await prisma.match.findMany({
       where: {
         tournamentId: req.params.id,
-        round: { gt: maxRound.round },
+        isTournamentMatch: true,
+        round: { gte: finalBracketMinRound },
       },
       include: {
         player1: {
@@ -2337,6 +2473,10 @@ router.get('/:id/tournament-bracket', authenticate, async (req: AuthRequest, res
         { matchNumber: 'asc' },
       ],
     })
+
+    if (tournamentMatches.length === 0) {
+      return res.json({ matches: [], rounds: [] })
+    }
 
     // ラウンドごとにグループ化
     const roundsMap = new Map<number, any[]>()
@@ -2392,11 +2532,17 @@ router.delete('/:id/tournament-bracket', authenticate, requireRole('organizer', 
       return res.json({ message: '予選の回戦数が設定されていません' })
     }
 
-    // 決勝トーナメントのマッチを削除（予選の最終roundより後のround）
+    const prelimRoundsNumber =
+      typeof preliminaryRounds === 'number' ? preliminaryRounds : 0
+    const finalBracketMinRound =
+      Math.max(tournament.maxRounds || 0, prelimRoundsNumber) + 1
+
+    // 決勝トーナメントのマッチを削除（予選の最大回戦数より後のラウンドのみ）
     const deletedMatches = await prisma.match.deleteMany({
       where: {
         tournamentId: req.params.id,
-        round: { gt: preliminaryRounds },
+        isTournamentMatch: true,
+        round: { gte: finalBracketMinRound },
       },
     })
 
