@@ -29,7 +29,7 @@ export default function Header() {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
         <Link to="/" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold' }}>
-          TCG Tournament
+          TCG大会システム
         </Link>
         <nav style={{ display: 'flex', gap: '15px' }}>
           <Link to="/" style={{ color: '#fff', textDecoration: 'none' }}>
